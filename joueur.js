@@ -35,11 +35,55 @@ export class Joueur{
         }
         return null
     }
-    pioche(n,g){ //comme la fonction pose, si on clique sur la pioche, cela revoira a cette fonction
+
+    old_pioche(n,g){ //comme la fonction pose, si on clique sur la pioche, cela revoira a cette fonction
         //Si cette fonction est appele, ajoute une n cartes au joueur
         if (this.tour == true){
             this.jeu.ajoutercartes(n,g)
         }
+    }
+
+    pioche(g){ //comme la fonction pose, si on clique sur la pioche, cela revoira a cette fonction
+        //Si cette fonction est appele, ajoute une n cartes au joueur
+        if (this.tour == true){
+            let end = false
+            while (end == false){
+                this.jeu.ajoutercartes(1,g)
+                if (this.pose(this.jeu.cartes[this.jeu.cartes.length-1],g.tas.devant,g,this.jeu.cartes.length-1)){
+                    if (this.ordi == true){
+                        if (this.jeu.cartes[this.jeu.cartes.length-1].get_valeur() == "+4" || this.jeu.cartes[this.jeu.cartes.length-1].get_valeur() == "joker"){
+                            console.log("keep card")
+                            console.log(this.jeu.cartes.length)
+                            return null
+                        }
+                        else {
+                            console.log("play card")
+                            console.log(this.jeu.cartes.length)
+                            return [this.jeu.cartes[this.jeu.cartes.length-1],this.jeu.cartes.length-1]
+                        }
+                    } else {
+                        console.log("no no zone")
+                        //inserer le button pour garder ou jouer la carte
+                        while(true){
+                            if(this.J_pioche() == "play"){
+                                return [this.jeu.cartes[this.jeu.cartes.length-1],this.jeu.cartes.length-1]
+                            } else if(this.J_pioche() == "keep"){
+                                return null
+                            }
+                        }
+                    }
+                    end = true
+                }
+            }
+            
+        }
+    }
+
+    J_pioche(){
+        if (this.tour == true){
+            //inserer le get garder button et keep
+        }
+        return null
     }
         
     addpoint(n){
@@ -57,7 +101,7 @@ export class Joueur{
         availible a la priorite,si il y a des cartes normales qui pevent etre joue, le cpu choisira au hazard une carte dans avalible a poser
         Si il n'y a rien dans availible une carte speciale sera pose, toujours au hazard
         enfin si il n'y a ni carte possible a jouer ni carte speciale, le cpu pioche
-        reourne la carte et son rang, retourne None et None si l'ordi doit piocher*/
+        reourne la carte et son rang, retourne Null si l'ordi doit piocher et a gardé la carte*/
         let copycard = [...this.jeu.cartes]
         let special = []
         let availible = []
@@ -83,9 +127,9 @@ export class Joueur{
             return [special[k][0] , special[k][1]]
         }
         else {
-            this.pioche(1,game)
+            console.log(this.jeu.cartes.length)
             console.log("pioche")
-            return null
+            return this.pioche(game)
         }
     }
 }

@@ -1,4 +1,4 @@
-import { Game } from './game.js';
+import {Game} from './game.js';
 import {comp} from './cpu.js'
 const gaming = new Game()
 gaming.createjoueur(4)
