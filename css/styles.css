@@ -20,7 +20,7 @@ button {
 }
 .banner {
   height: 260px;
-  background-image: url(unoband.jpg);
+  background-image: url(../unoband.jpg);
   background-size: cover;
   background-position: center;
   position: relative;
