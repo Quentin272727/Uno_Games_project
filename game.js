@@ -38,9 +38,9 @@ export class Game{
         prendra comme argument n pour le nombre de joueur*/
         for (let i = 0; i < n; i += 1){
             if (i == 0){
-                this.joueur.push(new Joueur(false,`joueur${i+1}`))
+                this.joueur.push(new Joueur(true,`joueur${i+1}`))
             } else{
-                this.joueur.push(new Joueur(false,`joueur${i+1}`))
+                this.joueur.push(new Joueur(true,`joueur${i+1}`))
             }
         }
     }
@@ -54,7 +54,7 @@ export class Game{
             let ejected = null
             let x = 0
             while (ejected == null){
-                if (newcolorlist[x] == game.tas.endessous.get_couleur()){
+                if (newcolorlist[x] == this.tas.endessous.get_couleur()){
                     ejected = newcolorlist[x]
                 }
                 x +=1
@@ -120,11 +120,12 @@ export class Game{
             this.etape = 'le joueur a joue'
             this.tas.new_card(c[0])
             player.jeu.retirercarte(c[1])
+            this.last_card(player)
             if (player.jeu.cartes.length == 0){
                 this.gagnant = player
                 return null
             }
-            else{
+            else {
                 this.action(c[0])
             }
     }
@@ -149,7 +150,6 @@ export class Game{
         le premier joueur ne bouge pas donc*/
         let selectedcolor = null
         if (c.get_valeur() == "+4"){
-            console.log("fevbnhvchujfdbvfuhdfbnvhujfbnvuhjfbnuvhfbnvuhjfbnvuhfgnbvuhgrnbvuhgrnbuhjgtbnujhgrnbvuhjnbrfeujhvnhjfurnbvujhfrbnvjhfrbnuvbnrtuhvbnuhirbnvuhirbn")
             if (premier == false){
                 this.joueur[1].jeu.ajoutercartes(4,this)
             } else {
@@ -159,20 +159,20 @@ export class Game{
                 this.tas.new_card(new Carte(selectedcolor,c.valeur))
             }
         }
-        if (c.get_valeur() == "joker"){
+        else if (c.get_valeur() == "joker"){
             if (this.joueur[0].ordi == true || premier == true){
                 selectedcolor = this.AI_select_color(premier)
                 this.tas.new_card(new Carte(selectedcolor,c.valeur)) //Pareil que le +4
             }
         }
-        if (c.get_valeur() == "+2"){
+        else if (c.get_valeur() == "+2"){
             if (premier == false){
                 this.joueur[1].jeu.ajoutercartes(2,this)
             } else {
                 this.joueur[0].jeu.ajoutercartes(2,this)
             }
         }
-        if (c.get_valeur() == "inverse"){
+        else if (c.get_valeur() == "inverse"){
             let temp = null
             if (this.joueur.length%2 == 0){
                 for (let i = 1; i < parseInt(this.joueur.length/2); i += 1){
@@ -187,6 +187,12 @@ export class Game{
                     this.joueur[i] = temp
                 }
             }
+        }
+        if (c.get_valeur() == "block" || c.get_valeur() == "+4" || c.get_valeur() == "+2"){
+            this.joueur[0].tour = false
+            let temp = this.joueur[0] //skip le tour du joueur suivant
+            this.joueur.splice(0,1)
+            this.joueur.push(temp)
         }
     }
     calculscore(){
@@ -222,7 +228,7 @@ export class Game{
     victoire(joueur){
         /*En cas de victoire, met que le jeu a trouver un gagnant et calcule sont score
         prend comme argument le joueur gagnant
-        #calcul de points, menu de victoire, retirer les cartes
+        calcul de points, menu de victoire, retirer les cartes
         print('yey')*/
         joueur.addpoint(this.calculscore(joueur))
         this.victory = true
@@ -230,9 +236,58 @@ export class Game{
         console.log("le gagant est: " + joueur.nom + " pts: " + joueur.points)
         //self.tas.reset()
     }
+    last_card(joueur){ //appelé quand un joueur n'as plus qu'un seule carte
+        if (joueur.jeu.cartes.length == 1){
+            let result = this.minigame(joueur)
+            if (result.nom != joueur.nom){
+                console.log("Uno lost")
+                joueur.jeu.ajoutercartes(2,this)
+            } else {
+                console.log("Uno win")
+            }
+            for (let i = 0; i < this.joueur.length; i += 1){
+                this.joueur[i].uno = false
+                this.joueur[i].pressed = -1
+            }
+        }
+    }
+
+    minigame(joueur){
+        // afficher le button UNO! du joueur qui vient d'être en uno
+        let start = Date.now()
+        let press = false
+        for (let j = 0; j < this.joueur.length; j += 1){
+            if (joueur.nom == this.joueur[j].nom && this.joueur[j].ordi == true){
+                joueur.timing = 150 + getRandomInt(1000)
+            }
+            else if (this.joueur[j].ordi == true){
+                this.joueur[j].timing = 300 + getRandomInt(1000)
+            }
+        }
+        while (press == false){
+            if (Date.now() - start == 200){
+                //afficher les buttons pour les autres joueurs
+            }
+            for (let i = 0; i < this.joueur.length; i += 1){
+                if (this.joueur[i].ordi == true){
+                    if (this.joueur[i].timing <= Date.now() - start){
+                        this.joueur[i].uno = true
+                    }
+                }
+                // pour detecter le click d'un joueur cela sera à une fonction extérieur de le faire
+                if (this.joueur[i].uno == true){ //ceci détecte si quelqu'un à pressé le bouton et le retourne
+                    press = true
+                    console.log(Date.now() - start +"   "+ this.joueur[i].nom)
+                    return this.joueur[i]
+                }
+            }
+
+        }
+    }
 
     new_turn(){
-        //"Change l'ordre de passage, et met true au tour du joueur qui doit jouer"
+        //Change l'ordre de passage, et met true au tour du joueur qui doit jouer
+        this.joueur[0].tour = false
         let temp = this.joueur[0]
         this.joueur.splice(0,1)
         this.joueur.push(temp)

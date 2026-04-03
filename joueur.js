@@ -7,6 +7,8 @@ export class Joueur{
         this.tour = false // False = n'est pas le tour du joueur, True c'est a son tour de poser une carte
         this.ordi = pc  // Vrai si c'est l'ordi qui le controle, Faux sinon
         this.nom = name // nom du joueur, pour les ordinateur on prendra une liste d'un fichier probablement
+        this.uno = false // est utilisé pour detecter si le joueur a pressé le button d'uno pour le UNO ou contre UNO
+        this.timing = -1 // est utilisé uniquement par les ordis pour savoir quand le bouton UNO pourra être presser
     }
     str(){
             return `nom ${this.nom}, ${this.points} pts, ${this.tour}, ordi? ${this.ordi}`
@@ -36,7 +38,6 @@ export class Joueur{
     pioche(n,g){ //comme la fonction pose, si on clique sur la pioche, cela revoira a cette fonction
         //Si cette fonction est appele, ajoute une n cartes au joueur
         if (this.tour == true){
-            this.tour == false
             this.jeu.ajoutercartes(n,g)
         }
     }
