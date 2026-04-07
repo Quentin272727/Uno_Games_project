@@ -115,8 +115,9 @@ export class Game{
         si le joueur ne gagne pas, le jeu va voir si sa carte fais une action
         Prend 3 argument, le joueur qui a clique ou l'ordi qui joue la carte, puis la carte selectionne et son rang*/
         if (player.tour == true)
-            if (c == null)
+            if (c == null){
                 return null
+            }
             this.etape = 'le joueur a joue'
             this.tas.new_card(c[0])
             player.jeu.retirercarte(c[1])

@@ -1,4 +1,4 @@
-import './server/Server.js'   
+import './server/public/Server.js'   
 
 import { Game } from './game.js'
 import { comp } from './cpu.js'
