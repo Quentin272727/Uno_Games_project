@@ -1,6 +1,6 @@
 import { Paquet, Carte, Tas } from './cartes.js';
 import { Joueur } from './joueur.js';
-import { getRandomInt } from './cusfunc.js';
+import{ getRandomInt } from './cusfunc.js';
 export class Game{
     constructor(){
         /*etape: dit a quelle etape est le jeu, concretement ne sert a rien
