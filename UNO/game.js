@@ -1,5 +1,5 @@
 import { Paquet, Carte, Tas } from './cartes.js';
-import { Joueur } from './joueur.js';
+import { Joueur } from '../joueur.js';
 import{ getRandomInt } from './cusfunc.js';
 export class Game{
     constructor(){
