@@ -9,8 +9,16 @@ const app = express();
 // Servir les fichiers statiques depuis la racine du projet
 app.use(express.static(path.join(__dirname, '../..')));
 
-app.get('/', (req, res) => {
+app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, '../../html/connection.html'));
+});
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../html/main.html'));
+});
+
+app.get('/game', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../html/jeux.html'));
 });
 
 const port = 8000;
