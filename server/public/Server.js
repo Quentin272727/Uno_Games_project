@@ -17,6 +17,10 @@ app.get('/main', (req, res) => {
     res.sendFile(path.join(__dirname, '../../html/main.html'));
 });
 
+app.get('/jeux', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../html/jeux.html'));
+});
+
 const port = 8000;
 app.listen(port, () => {
     console.log(`server is running on http://localhost:${port}`);
