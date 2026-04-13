@@ -1,0 +1,32 @@
+body {
+  font-family: Arial;
+  text-align: center;
+  background: rgb(68, 68, 68);
+}
+
+#lobby {
+  margin-top: 30px;
+}
+
+.joueur {
+  display: inline-block;
+  margin: 10px;
+  padding: 15px;
+  width: 140px;
+  border-radius: 10px;
+  border: 2px solid #333;
+  background: white;
+}
+
+/* styles différents */
+.lobby-2 .joueur {
+  background: lightblue;
+}
+
+.lobby-3 .joueur {
+  background: lightyellow;
+}
+
+.lobby-4 .joueur {
+  background: lightgreen;
+}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+        <title>Lobby</title>
+    <link href="../css/main.css" rel="stylesheet">
+    <link href="../css/styles_lob.css" rel="stylesheet">
+</head>
+<body>
+
+  <h1>Lobby</h1>
+
+  <div id="lobby"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const nb = parseInt(params.get("joueurs"), 10) || 2;
+
+  const lobby = document.getElementById("lobby");
+  lobby.classList.add("lobby-" + nb);
+
+  // Création des cases joueurs
+  for (let i = 1; i <= nb; i++) {
+    const div = document.createElement("div");
+    div.className = "joueur";
+    div.dataset.index = i;
+    div.innerHTML = `
+      <strong>Joueur ${i}</strong><br>
+      En attente...
+    `;
+    lobby.appendChild(div);
+  }
+
+  // Connexion Socket.io
+  const socket = io(); // se connecte au même host:port que la page
+
+  // Pour l’instant, un seul lobby "uno-local"
+  const lobbyId = "uno-local";
+
+  socket.emit("join-lobby", { lobbyId });
+
+  socket.on("lobby-state", ({ playersCount }) => {
+    const joueurs = document.querySelectorAll(".joueur");
+    joueurs.forEach((div, index) => {
+      if (index < playersCount) {
+        div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>Connecté`;
+      } else {
+        div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>En attente...`;
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

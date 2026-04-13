@@ -1,86 +1,56 @@
 import express from "express";
 import path from "path";
+import bcrypt from "bcrypt";
 import { fileURLToPath } from "url";
-import { createServer } from "http";
-import { Server as SocketIOServer } from "socket.io";
+import {createUser, findUser} from '../../Database/Database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// HTTP + Socket.io
-const httpServer = createServer(app);
-const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin: "*",
-  },
-});
+app.use(express.urlencoded({ extended: true })); //parser les données du formulaire
+app.use(express.json());
 
 // Servir les fichiers statiques depuis la racine du projet
-app.use(express.static(path.join(__dirname, "../..")));
+app.use(express.static(path.join(__dirname, '../..')));
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../../html/main.html"));
-});
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, '../../html/main.html')); });
 
-app.get("/main", (req, res) => {
-  res.sendFile(path.join(__dirname, "../../html/main.html"));
-});
+app.get('/main', (req, res) => { res.sendFile(path.join(__dirname, '../../html/main.html')); });
 
-app.get("/connection", (req, res) => {
-  res.sendFile(path.join(__dirname, "../../html/connection.html"));
-});
+app.get('/connection', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const user = await findUser(username);
+        if (!user) return res.status(401).send('Invalid credentials (username)'); //status code for invalid username
 
-app.get("/jeux", (req, res) => {
-  res.sendFile(path.join(__dirname, "../../html/jeux.html"));
-});
-
-app.get("/lobby", (req, res) => {
-  res.sendFile(path.join(__dirname, "../../html/lobby.html"));
-});
-
-// gestion de la mémo
-const lobbies = {}; // { lobbyId: { players: [socketId, ...] } }
-
-io.on("connection", (socket) => {
-  console.log("Nouvelle connexion :", socket.id);
-
-  socket.on("join-lobby", ({ lobbyId }) => {
-    if (!lobbies[lobbyId]) {
-      lobbies[lobbyId] = { players: [] };
+        const match = await bcrypt.compare(password, user.password);
+        if (!match) return res.status(401).send('Invalid credentials(password)'); //status code for invalid password
+    } catch (error) {
+        res.status(500).send('Internal Server Error');
     }
+});
 
-    if (!lobbies[lobbyId].players.includes(socket.id)) {
-      lobbies[lobbyId].players.push(socket.id);
+app.get('/jeux', (req, res) => { res.sendFile(path.join(__dirname, '../../html/jeux.html')); });
+
+app.get('/lobby', (req, res) => { res.sendFile(path.join(__dirname, '../../html/lobby.html')); });
+
+app.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        await createUser(username,password);
+        res.redirect('/main');
+    } catch (error) {
+        if (error.message .includes('UNIQUE')) {
+            res.status(409).send('Username already exists'); // Conflict status code for duplicate username
+        } else {
+            res.status(500).send('Internal Server Error');
+        }
     }
-
-    socket.join(lobbyId);
-
-    io.to(lobbyId).emit("lobby-state", {
-      lobbyId,
-      playersCount: lobbies[lobbyId].players.length,
-    });
-  });
-
-  socket.on("disconnect", () => {
-    for (const lobbyId in lobbies) {
-      const lobby = lobbies[lobbyId];
-      lobby.players = lobby.players.filter((id) => id !== socket.id);
-
-      if (lobby.players.length === 0) {
-        delete lobbies[lobbyId];
-      } else {
-        io.to(lobbyId).emit("lobby-state", {
-          lobbyId,
-          playersCount: lobby.players.length,
-        });
-      }
-    }
-  });
 });
 
 const port = 8000;
-httpServer.listen(port, () => {
-  console.log(`server is running on http://localhost:${port}`);
+app.listen(port, () => {
+    console.log(`server is running on http://localhost:${port}`);
 });

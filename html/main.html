@@ -11,18 +11,34 @@
 <body>
     <main class="main">
         <ul>
-<<<<<<< HEAD
             <li><a href="/main" class="active">UNO</a></li>
             <li style="float:right"><a href="/connection">S'inscrire / se connecter</a></li>
-=======
-            <li><a href="/" class="active">UNO</a></li>
-            <li style="float:right"><a href="/login">S'inscrire / se connecter</a></li>
->>>>>>> e0f70a4150f9fb1f2f4adf190926965fef5c900d
         </ul>
         <div class="banner"></div>
-        <div class="bouton">
-            <button onclick="window.location='/jeux'">Jouer</button>
-        </div>
+        <h1>Choisir le nombre de joueurs</h1>
+
+        <select id="nbJoueurs">
+            <option value="1">1 joueur</option>
+            <option value="2">2 joueurs</option>
+            <option value="3">3 joueurs</option>
+            <option value="4">4 joueurs</option>
+        </select>
+
+        <br><br>
+
+        <button onclick="valider()">Valider</button>
+
+        <script>
+            function valider() {
+            const nb = document.getElementById("nbJoueurs").value;
+            if (nb == 1) {
+                window.location.href = "jeux";
+                return;
+            }
+            // on envoie la valeur vers la page lobby
+            window.location.href = "lobby?joueurs=" + nb;
+            }
+        </script>
     </main>
 </body>
 </html>
