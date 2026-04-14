@@ -9,15 +9,13 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// HTTP + Socket.io
+
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin: "*",
-  },
+  cors: { origin: "*" },
 });
 
-// Servir les fichiers statiques depuis la racine du projet
+// Fichiers statiques
 app.use(express.static(path.join(__dirname, "../..")));
 
 app.get("/", (req, res) => {
@@ -40,35 +38,55 @@ app.get("/lobby", (req, res) => {
   res.sendFile(path.join(__dirname, "../../html/lobby.html"));
 });
 
-// gestion de la memoire du lobby 
-const lobbies = {}; // { lobbyId: { players: [socketId, ...] } }
+// Mémoire des lobbys
+const lobbies = {}; // { lobbyId: { players: [] } }
+const idToSocket = {}; // Associe un playerId à un socket.id
 
 io.on("connection", (socket) => {
   console.log("Nouvelle connexion :", socket.id);
 
-socket.on("join-lobby", ({ lobbyId, maxPlayers }) => {
+  // Associer un playerId au socket
+  socket.on("register-id", (playerId) => {
+    idToSocket[playerId] = socket.id;
+  });
+
+  // INVITATION envoyée par le créateur
+  socket.on("invite-friends", ({ lobbyId, invitedIds }) => {
+    invitedIds.forEach((pid) => {
+      const targetSocket = idToSocket[pid];
+      if (targetSocket) {
+        io.to(targetSocket).emit("receive-invite", {
+          lobbyId,
+          from: socket.id,
+        });
+      }
+    });
+  });
+
+  // Rejoindre un lobby
+  socket.on("join-lobby", ({ lobbyId, maxPlayers }) => {
     if (!lobbies[lobbyId]) {
-        lobbies[lobbyId] = { players: [], maxPlayers };
+      lobbies[lobbyId] = { players: [], maxPlayers };
     }
 
     if (!lobbies[lobbyId].players.includes(socket.id)) {
-        lobbies[lobbyId].players.push(socket.id);
+      lobbies[lobbyId].players.push(socket.id);
     }
 
     socket.join(lobbyId);
 
     io.to(lobbyId).emit("lobby-state", {
-        lobbyId,
-        playersCount: lobbies[lobbyId].players.length,
+      lobbyId,
+      playersCount: lobbies[lobbyId].players.length,
     });
 
-    // Lancer la partie quand le lobby est plein
+
     if (lobbies[lobbyId].players.length === lobbies[lobbyId].maxPlayers) {
-        io.to(lobbyId).emit("start-game");
+      io.to(lobbyId).emit("start-game");
     }
-});
+  });
 
-
+  // Déconnexion
   socket.on("disconnect", () => {
     for (const lobbyId in lobbies) {
       const lobby = lobbies[lobbyId];
@@ -81,8 +99,8 @@ socket.on("join-lobby", ({ lobbyId, maxPlayers }) => {
           lobbyId,
           playersCount: lobby.players.length,
         });
+ 
       }
-
 
     }
   });
