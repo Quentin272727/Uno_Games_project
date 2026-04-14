@@ -16,6 +16,10 @@
 
   <div id="lobby"></div>
 
+  <button id="force-start" style="margin-top:20px; display:none;">
+  Rejoindre la partie quand même
+  </button>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
   // génération & récup de l'id
@@ -35,6 +39,15 @@
   const params = new URLSearchParams(window.location.search);
   const nb = parseInt(params.get("joueurs"), 10) || 2;
 
+  if (nb > 1) {
+    document.getElementById("force-start").addEventListener("click", () => {
+  window.location.href = "/jeux";
+});
+
+  document.getElementById("force-start").style.display = "block";
+}
+
+
   const lobby = document.getElementById("lobby");
   lobby.classList.add("lobby-" + nb);
 
@@ -52,18 +65,37 @@
   // ajouter socket.io (définir)
   const socket = io();
 
+  socket.on("start-game", () => {
+  window.location.href = "/jeux";
+});
+
+
   let currentLobbyId = null;
 
   // Fonction pour rejoindre un lobby privé
-  function joinFriendLobby() {
-    const friendId = document.getElementById("friend-id").value.trim();
-    if (!friendId) return alert("Entre l'ID de ton ami");
+function joinFriendLobby() {
+  const friendId = document.getElementById("friend-id").value.trim();
+  if (!friendId) return alert("Entre l'ID de ton ami");
 
-    // Création d'un lobby unique basé sur les deux IDs
-    currentLobbyId = [myId, friendId].sort().join("-");
-
-    socket.emit("join-lobby", { lobbyId: currentLobbyId });
+  if (nb === 1) {
+    // SOLO 
+    window.location.href = "./game";
+    return;
   }
+
+  if (nb === 2) {
+    // LOBBY 2 JOUEURS 
+    currentLobbyId = [myId, friendId].sort().join("-");
+  }
+
+  if (nb === 3 || nb === 4) {
+    // LOBBY 3 ET 4 JOUEURS  basé sur un ID maître
+    currentLobbyId = friendId;
+  }
+
+  socket.emit("join-lobby", { lobbyId: currentLobbyId, maxPlayers: nb });
+}
+
 
   // Mise à jour du lobby
   socket.on("lobby-state", ({ playersCount }) => {
@@ -77,11 +109,10 @@
         div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>En attente...`;
       }
     });
-    socket.on("start-game", () => {
-    window.location.href = "/jeux"; // ou /jeux selon ton chemin
+
 });
 
-  });
+
 </script>
 
 </body>
