@@ -77,6 +77,10 @@
         div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>En attente...`;
       }
     });
+    socket.on("start-game", () => {
+    window.location.href = "/game"; // ou /jeux selon ton chemin
+});
+
   });
 </script>
 

@@ -46,23 +46,29 @@ const lobbies = {}; // { lobbyId: { players: [socketId, ...] } }
 io.on("connection", (socket) => {
   console.log("Nouvelle connexion :", socket.id);
 
-  socket.on("join-lobby", ({ lobbyId }) => {
-  console.log("join-lobby reçu pour", lobbyId, "par", socket.id);
+socket.on("join-lobby", ({ lobbyId }) => {
+    console.log("join-lobby reçu pour", lobbyId, "par", socket.id);
+
     if (!lobbies[lobbyId]) {
-      lobbies[lobbyId] = { players: [] };
+        lobbies[lobbyId] = { players: [] };
     }
 
     if (!lobbies[lobbyId].players.includes(socket.id)) {
-      lobbies[lobbyId].players.push(socket.id);
+        lobbies[lobbyId].players.push(socket.id);
     }
 
     socket.join(lobbyId);
 
     io.to(lobbyId).emit("lobby-state", {
-      lobbyId,
-      playersCount: lobbies[lobbyId].players.length,
+        lobbyId,
+        playersCount: lobbies[lobbyId].players.length,
     });
-  });
+
+    //  lancement auto si 2 joueurs co
+    if (lobbies[lobbyId].players.length === 2) {
+        io.to(lobbyId).emit("start-game");
+    }
+});
 
   socket.on("disconnect", () => {
     for (const lobbyId in lobbies) {
@@ -77,9 +83,7 @@ io.on("connection", (socket) => {
           playersCount: lobby.players.length,
         });
       }
-      if (lobbies[lobbyId].players.length === 2) {
-    io.to(lobbyId).emit("start-game");
-    }
+
 
     }
   });
