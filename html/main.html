@@ -28,6 +28,10 @@
 
         <button onclick="valider()">Valider</button>
 
+        <br><br>
+
+        <p>Ton ID : <span id="my-id"></span></p>
+
         <script>
             function valider() {
             const nb = document.getElementById("nbJoueurs").value;
@@ -38,6 +42,18 @@
             // on envoie la valeur vers la page lobby
             window.location.href = "lobby?joueurs=" + nb;
             }
+            function generateId() {
+                 return Math.random().toString(36).substring(2, 8).toUpperCase();
+            }
+
+            let myId = localStorage.getItem("playerId");
+            if (!myId) {
+                myId = generateId();
+                localStorage.setItem("playerId", myId);
+            }
+
+            document.getElementById("my-id").textContent = myId;
+
         </script>
     </main>
 </body>

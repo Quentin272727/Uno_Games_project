@@ -1,26 +1,42 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-        <title>Lobby</title>
-    <link href="../css/main.css" rel="stylesheet">
-    <link href="../css/styles_lob.css" rel="stylesheet">
-</head>
 <body>
 
   <h1>Lobby</h1>
+
+  <!-- Zone affichage id -->
+  <div style="margin-bottom: 20px;">
+    <strong>Ton ID :</strong> <span id="my-id"></span>
+  </div>
+
+  <!-- barre pour rentrer l'id d'un ami  -->
+  <div style="margin-bottom: 20px;">
+    <input id="friend-id" placeholder="ID de ton ami">
+    <button onclick="joinFriendLobby()">Rejoindre</button>
+  </div>
 
   <div id="lobby"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+  // génération & récup de l'id
+  function generateId() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+
+  let myId = localStorage.getItem("playerId");
+  if (!myId) {
+    myId = generateId();
+    localStorage.setItem("playerId", myId);
+  }
+
+  document.getElementById("my-id").textContent = myId;
+
+ 
   const params = new URLSearchParams(window.location.search);
   const nb = parseInt(params.get("joueurs"), 10) || 2;
 
   const lobby = document.getElementById("lobby");
   lobby.classList.add("lobby-" + nb);
 
-  // Création des cases joueurs
   for (let i = 1; i <= nb; i++) {
     const div = document.createElement("div");
     div.className = "joueur";
@@ -32,16 +48,27 @@
     lobby.appendChild(div);
   }
 
-  // Connexion Socket.io
-  const socket = io(); // se connecte au même host:port que la page
+  // ajouter socket.io (définir)
+  const socket = io();
 
-  // Pour l’instant, un seul lobby "uno-local"
-  const lobbyId = "uno-local";
+  let currentLobbyId = null;
 
-  socket.emit("join-lobby", { lobbyId });
+  // Fonction pour rejoindre un lobby privé
+  function joinFriendLobby() {
+    const friendId = document.getElementById("friend-id").value.trim();
+    if (!friendId) return alert("Entre l'ID de ton ami");
 
+    // Création d'un lobby unique basé sur les deux IDs
+    currentLobbyId = [myId, friendId].sort().join("-");
+
+    socket.emit("join-lobby", { lobbyId: currentLobbyId });
+  }
+
+  // Mise à jour du lobby
   socket.on("lobby-state", ({ playersCount }) => {
     const joueurs = document.querySelectorAll(".joueur");
+    console.log("État lobby reçu :", playersCount);
+
     joueurs.forEach((div, index) => {
       if (index < playersCount) {
         div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>Connecté`;
