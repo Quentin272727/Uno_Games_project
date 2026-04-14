@@ -77,6 +77,10 @@ io.on("connection", (socket) => {
           playersCount: lobby.players.length,
         });
       }
+      if (lobbies[lobbyId].players.length === 2) {
+    io.to(lobbyId).emit("start-game");
+    }
+
     }
   });
 });
