@@ -1,119 +1,162 @@
-<body>
+<html>
+  <body>
+    <h1>Lobby</h1>
 
-  <h1>Lobby</h1>
+    <div style="margin-bottom: 20px;">
+      <strong>Ton ID :</strong> <span id="my-id"></span>
+    </div>
 
-  <!-- Zone affichage id -->
-  <div style="margin-bottom: 20px;">
-    <strong>Ton ID :</strong> <span id="my-id"></span>
-  </div>
+    <div style="margin-bottom: 20px;">
+      <link rel="stylesheet" href="/css/styles_lob.css">
+      <input id="friend-id" placeholder="ID de tes amis (séparés par des virgules)">
+      <button onclick="inviteFriends()">Inviter</button>
+    </div>
 
-  <!-- barre pour rentrer l'id d'un ami  -->
-  <div style="margin-bottom: 20px;">
-    <link rel="stylesheet" href="/css/styles_lob.css">
-    <input id="friend-id" placeholder="ID de ton ami">
-    <button onclick="joinFriendLobby()">Rejoindre</button>
-  </div>
+    <div id="lobby"></div>
 
-  <div id="lobby"></div>
+    <button id="force-start" style="margin-top:20px; display:none;">
+      Rejoindre la partie quand même
+    </button>
 
-  <button id="force-start" style="margin-top:20px; display:none;">
-  Rejoindre la partie quand même
-  </button>
+    <button id="back-btn" style="margin-top:10px; display:block;">
+      Retour
+    </button>
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-  // génération & récup de l'id
-  function generateId() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
-  }
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
 
-  let myId = localStorage.getItem("playerId");
-  if (!myId) {
-    myId = generateId();
-    localStorage.setItem("playerId", myId);
-  }
-
-  document.getElementById("my-id").textContent = myId;
-
- 
-  const params = new URLSearchParams(window.location.search);
-  const nb = parseInt(params.get("joueurs"), 10) || 2;
-
-  if (nb > 1) {
-    document.getElementById("force-start").addEventListener("click", () => {
-  window.location.href = "/jeux";
-});
-
-  document.getElementById("force-start").style.display = "block";
-}
-
-
-  const lobby = document.getElementById("lobby");
-  lobby.classList.add("lobby-" + nb);
-
-  for (let i = 1; i <= nb; i++) {
-    const div = document.createElement("div");
-    div.className = "joueur";
-    div.dataset.index = i;
-    div.innerHTML = `
-      <strong>Joueur ${i}</strong><br>
-      En attente...
-    `;
-    lobby.appendChild(div);
-  }
-
-  // ajouter socket.io (définir)
-  const socket = io();
-
-  socket.on("start-game", () => {
-  window.location.href = "/jeux";
-});
-
-
-  let currentLobbyId = null;
-
-  // Fonction pour rejoindre un lobby privé
-function joinFriendLobby() {
-  const friendId = document.getElementById("friend-id").value.trim();
-  if (!friendId) return alert("Entre l'ID de ton ami");
-
-  if (nb === 1) {
-    // SOLO 
-    window.location.href = "./game";
-    return;
-  }
-
-  if (nb === 2) {
-    // LOBBY 2 JOUEURS 
-    currentLobbyId = [myId, friendId].sort().join("-");
-  }
-
-  if (nb === 3 || nb === 4) {
-    // LOBBY 3 ET 4 JOUEURS  basé sur un ID maître
-    currentLobbyId = friendId;
-  }
-
-  socket.emit("join-lobby", { lobbyId: currentLobbyId, maxPlayers: nb });
-}
-
-
-  // Mise à jour du lobby
-  socket.on("lobby-state", ({ playersCount }) => {
-    const joueurs = document.querySelectorAll(".joueur");
-    console.log("État lobby reçu :", playersCount);
-
-    joueurs.forEach((div, index) => {
-      if (index < playersCount) {
-        div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>Connecté`;
-      } else {
-        div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>En attente...`;
+      //initialisation
+      function generateId() {
+        return Math.random().toString(36).substring(2, 8).toUpperCase();
       }
-    });
 
-});
+      let myId = localStorage.getItem("playerId");
+      if (!myId) {
+        myId = generateId();
+        localStorage.setItem("playerId", myId);
+      }
+
+      document.getElementById("my-id").textContent = myId;
+
+      const params = new URLSearchParams(window.location.search);
+      const nb = parseInt(params.get("joueurs"), 10) || 2;
+
+      // Récupération du lobbyId (créateur OU invité)
+      let lobbyId = params.get("lobbyId") || myId;
+
+      const socket = io();
+
+      // Enregistrer mon ID
+      socket.emit("register-id", myId);
+
+      // Rejoindre le lobby
+      socket.emit("join-lobby", { lobbyId, maxPlayers: nb });
+
+      // affichage du lobby
+
+      const lobby = document.getElementById("lobby");
+      lobby.classList.add("lobby-" + nb);
+
+      for (let i = 1; i <= nb; i++) {
+        const div = document.createElement("div");
+        div.className = "joueur";
+        div.innerHTML = `<strong>Joueur ${i}</strong><br>En attente...`;
+        lobby.appendChild(div);
+      }
+
+      // Mise à jour du lobby
+      socket.on("lobby-state", ({ playersCount }) => {
+        const joueurs = document.querySelectorAll(".joueur");
+
+        joueurs.forEach((div, index) => {
+          if (index < playersCount) {
+            div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>Connecté`;
+          } else {
+            div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>En attente...`;
+          }
+        });
+      });
 
 
-</script>
+      //système d'invitations
 
-</body>
+      function inviteFriends() {
+        const raw = document.getElementById("friend-id").value.trim();
+        if (!raw) return alert("Entre au moins un ID");
+
+        const invitedIds = raw.split(",").map(x => x.trim());
+        socket.emit("invite-friends", { lobbyId, invitedIds });
+      }
+
+
+      // démarage forcé
+
+      // Bouton "Rejoindre quand même"
+      if (nb > 1) {
+        document.getElementById("force-start").style.display = "block";
+
+        document.getElementById("force-start").onclick = () => {
+          console.log("Demande de démarrage envoyée");
+          socket.emit("request-start", { lobbyId });
+        };
+      }
+
+      // Bouton Retour
+      document.getElementById("back-btn").onclick = () => {
+        window.location.href = "/main";
+      };
+
+      // Popup pour les AUTRES joueurs
+      socket.on("vote-start-request", () => {
+        const popup = document.createElement("div");
+        popup.className = "invite-popup";
+
+        popup.innerHTML = `
+          <p>Un camarade veut lancer la partie</p>
+          <button id="vote-yes">✔</button>
+          <button id="vote-no">✖</button>
+        `;
+
+        document.body.appendChild(popup);
+
+        document.getElementById("vote-yes").onclick = () => {
+          socket.emit("vote-response", { lobbyId, accepted: true });
+          popup.remove();
+        };
+
+        document.getElementById("vote-no").onclick = () => {
+          socket.emit("vote-response", { lobbyId, accepted: false });
+          popup.remove();
+        };
+      });
+
+      // Popup pour le lanceur si quelqu’un refuse
+      socket.on("vote-denied", () => {
+        const popup = document.createElement("div");
+        popup.className = "invite-popup";
+
+        popup.innerHTML = `
+          <p>Un joueur a refusé le lancement.<br>Voulez-vous rejoindre une partie ?</p>
+          <button id="retry-yes">✔</button>
+          <button id="retry-no">✖</button>
+        `;
+
+        document.body.appendChild(popup);
+
+        document.getElementById("retry-yes").onclick = () => {
+          window.location.href = "/main";
+        };
+
+        document.getElementById("retry-no").onclick = () => {
+          popup.remove();
+        };
+      });
+
+      //démarage automatique
+      socket.on("start-game", () => {
+        window.location.href = "/jeux";
+      });
+
+    </script>
+  </body>
 </html>

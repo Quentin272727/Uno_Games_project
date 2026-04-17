@@ -1,20 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="../css/styles.css" rel="stylesheet">
     <link href="../css/navbar.css" rel="stylesheet">
     <link href="../css/main.css" rel="stylesheet">
+    <link href="../css/invite.css" rel="stylesheet">
     <title>UNO</title>
 </head>
+
 <body>
+
     <main class="main">
+
+        <!-- NAVBAR -->
         <ul>
             <li><a href="/main" class="active">UNO</a></li>
             <li style="float:right"><a href="/connection">S'inscrire / se connecter</a></li>
         </ul>
+
+        <!-- BANNIÈRE UNO -->
         <div class="banner"></div>
+
         <h1>Choisir le nombre de joueurs</h1>
 
         <select id="nbJoueurs">
@@ -28,33 +36,70 @@
 
         <button onclick="valider()">Valider</button>
 
-        <br><br>
+    </main>
 
-        <p>Ton ID : <span id="my-id"></span></p>
+    <!-- SOCKET.IO -->
+    <script src="/socket.io/socket.io.js"></script>
 
-        <script>
-            function valider() {
+    <script>
+
+        // ID joueur
+        let myId = localStorage.getItem("playerId");
+        if (!myId) {
+            myId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            localStorage.setItem("playerId", myId);
+        }
+
+        const socket = io();
+        socket.emit("register-id", myId);
+
+        // Fonction Valider
+        function valider() {
             const nb = document.getElementById("nbJoueurs").value;
+
             if (nb == 1) {
                 window.location.href = "jeux";
                 return;
             }
-            // on envoie la valeur vers la page lobby
+
             window.location.href = "lobby?joueurs=" + nb;
-            }
-            function generateId() {
-                 return Math.random().toString(36).substring(2, 8).toUpperCase();
-            }
+        }
 
-            let myId = localStorage.getItem("playerId");
-            if (!myId) {
-                myId = generateId();
-                localStorage.setItem("playerId", myId);
-            }
+        // Réception d'une invitation
+        socket.on("receive-invite", ({ lobbyId }) => {
+            showInvitePopup(lobbyId);
+        });
 
-            document.getElementById("my-id").textContent = myId;
+        // POP-UP INVITATION
+        function showInvitePopup(lobbyId) {
+            const popup = document.createElement("div");
+            popup.className = "invite-popup";
 
-        </script>
-    </main>
+            popup.innerHTML = `
+                <p>Vous avez été invité à rejoindre une partie</p>
+                <button id="accept">Accepter</button>
+                <button id="decline">Décliner</button>
+            `;
+
+            document.body.appendChild(popup);
+
+            document.getElementById("accept").onclick = () => {
+                socket.emit("accept-invite", { lobbyId });
+                popup.remove();
+            };
+
+            document.getElementById("decline").onclick = () => {
+                socket.emit("decline-invite", { lobbyId });
+                popup.remove();
+            };
+        }
+
+        // Redirection automatique vers le bon lobby
+        socket.on("redirect-to-lobby", ({ lobbyId, maxPlayers }) => {
+            window.location.href = `/lobby?joueurs=${maxPlayers}&lobbyId=${lobbyId}`;
+        });
+
+    </script>
+
 </body>
 </html>
