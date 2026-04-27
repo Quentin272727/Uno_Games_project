@@ -138,10 +138,6 @@ const cardclick = (event) => {
 function pickColorUi() {
   const el = document.getElementById("colorpick");
   el.replaceChildren();
-  const font = document.createElement("img");
-  font.src = `${IMG_BASE}/font.png`;
-  font.width = 80;
-  el.appendChild(font);
   const colorpicker = ["rouge", "bleu", "vert", "jaune"];
   for (const col of colorpicker) {
     const btn = document.createElement("button");
