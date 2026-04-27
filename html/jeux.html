@@ -1,16 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>UNO — Partie</title>
+    <link rel="stylesheet" href="/css/jeux.css">
 </head>
-<body>
-    <div id="player3"></div>
-    <div id="middle"></div>
-    <div id="colorpick"></div>
-    <div id="player2"></div>
-    <div id="player1"></div>
+<body class="page-jeu">
+    <div id="hud" class="hud" aria-live="polite"></div>
+    <div id="opponents" class="opponents"></div>
+    <div class="play-zone">
+        <div id="middle" class="middle"></div>
+        <div id="colorpick" class="colorpick"></div>
+    </div>
+    <div id="player1" class="player-hand"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="module" src="/html/gamesript.js"></script>

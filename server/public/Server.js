@@ -6,6 +6,13 @@ import { Server as SocketIOServer } from "socket.io";
 import dbPkg from "../../Database/Database.js";
 const { createUser, findUser } = dbPkg;
 import bcrypt from "bcrypt";
+import {
+  handleInit,
+  handlePlayCard,
+  handlePlayWild,
+  handleDraw,
+  deleteGame,
+} from "./gameService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,23 +121,7 @@ io.on("connection", (socket) => {
 
   socket.on("gamestarts", () => {
     try {
-      let foundLobbyId = null;
-      for (const [lobbyId, lobby] of Object.entries(lobbies)) {
-        if (lobby.players.includes(socket.id)) {
-          foundLobbyId = lobbyId;
-          break;
-        }
-      }
-
-      // Player not in any lobby (e.g. arrived via force-start or direct URL)
-      // Create a solo lobby for them automatically
-      if (!foundLobbyId) {
-        foundLobbyId = "solo-" + socket.id;
-        lobbies[foundLobbyId] = { players: [socket.id], maxPlayers: 1 };
-        socket.join(foundLobbyId);
-      }
-
-      socket.emit("init_data", lobbies, foundLobbyId);
+      handleInit(io, socket, lobbies);
     } catch (err) {
       console.error("Erreur gamestarts:", err.message);
     }
@@ -138,20 +129,25 @@ io.on("connection", (socket) => {
 
   socket.on("draw_card", (lobbyId) => {
     try {
-      const lobby = lobbies[lobbyId];
-      if (!lobby) return;
-      const idx = lobby.players.indexOf(socket.id);
-      io.to(lobbyId).emit("info_draw", idx + 1);
+      handleDraw(io, socket, lobbies, lobbyId);
     } catch (err) {
       console.error("Erreur draw_card:", err.message);
     }
   });
 
-  socket.on("new_turn", (lobbyId) => {
+  socket.on("play_card", (payload) => {
     try {
-      socket.to(lobbyId).emit("play_next");
+      handlePlayCard(io, socket, lobbies, payload);
     } catch (err) {
-      console.error("Erreur new_turn:", err.message);
+      console.error("Erreur play_card:", err.message);
+    }
+  });
+
+  socket.on("play_wild", (payload) => {
+    try {
+      handlePlayWild(io, socket, lobbies, payload);
+    } catch (err) {
+      console.error("Erreur play_wild:", err.message);
     }
   });
 
@@ -161,6 +157,7 @@ io.on("connection", (socket) => {
         const lobby = lobbies[lobbyId];
         lobby.players = lobby.players.filter((id) => id !== socket.id);
         if (lobby.players.length === 0) {
+          deleteGame(lobbyId);
           delete lobbies[lobbyId];
         } else {
           io.to(lobbyId).emit("lobby-state", {
@@ -193,7 +190,7 @@ process.on("uncaughtException", (err) => {
 
 // ── Start ────────────────────────────────────────────────────────────────────
 
-const port = 8000;
+const port = Number(process.env.PORT) || 8000;
 httpServer.listen(port, "0.0.0.0", () => {
   console.log(`server is running on http://0.0.0.0:${port}`);
 });

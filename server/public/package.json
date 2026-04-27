@@ -4,7 +4,9 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test test/gameLobby.test.mjs",
+    "test:smoke": "node test/httpSmoke.mjs",
+    "test:all": "node --test test/gameLobby.test.mjs && node test/httpSmoke.mjs",
     "dev": "node server.js"
   },
   "keywords": [],

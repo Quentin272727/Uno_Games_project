@@ -43,7 +43,7 @@
     document.getElementById("force-start").addEventListener("click", () => {
       // Join a solo lobby under the player's own ID so the server knows about us
       currentLobbyId = "solo-" + myId;
-      socket.emit("join-lobby", { lobbyId: currentLobbyId, maxPlayers: 1 });
+      socket.emit("join-lobby", { lobbyId: currentLobbyId, maxPlayers: 2 });
       setTimeout(() => { window.location.href = "/jeux"; }, 100);
     });
   document.getElementById("force-start").style.display = "block";
@@ -76,14 +76,13 @@
 
   // Fonction pour rejoindre un lobby privé
 function joinFriendLobby() {
-  const friendId = document.getElementById("friend-id").value.trim();
-  if (!friendId) return alert("Entre l'ID de ton ami");
-
   if (nb === 1) {
-    // SOLO 
-    window.location.href = "./game";
+    window.location.href = "/jeux";
     return;
   }
+
+  const friendId = document.getElementById("friend-id").value.trim();
+  if (!friendId) return alert("Entre l'ID de ton ami");
 
   if (nb === 2) {
     // LOBBY 2 JOUEURS 

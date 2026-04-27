@@ -251,6 +251,10 @@ export class Game{
     }
 
     minigame(joueur){
+        // Le mini-jeu "UNO !" côté navigateur; sur Node, évite une boucle infinie.
+        if (typeof globalThis === "object" && !globalThis.window) {
+            return joueur
+        }
         // afficher le button UNO! du joueur qui vient d'être en uno
         let start = Date.now()
         let press = false

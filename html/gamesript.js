@@ -1,202 +1,198 @@
-import { Game } from "../UNO/game.js";
-import { Carte } from "../UNO/cartes.js";
-import {comp} from "../UNO/cpu.js";
+const IMG_BASE = "/images_cartes";
 
-//draw the card duh
-let curJ = null
-let step = 'start'
-let oncolorpick = false
+function handPath(v, c) {
+  if (v === "joker" || v === "+4") return `${IMG_BASE}/${v}.png`;
+  return `${IMG_BASE}/${v}_${c}.png`;
+}
 
-function draw_card(id){
-    // delete every cards
-    const divid = ["player1","player2","player3","middle"]
-    for (let p = 0; p < divid.length; p += 1){
-        const container = document.getElementById(divid[p]);
-        container.replaceChildren();
+function discardPath(d) {
+  if (!d) return null;
+  const { v, c } = d;
+  if (v === "+4" && c) return `${IMG_BASE}/+4_${c}.png`;
+  if (v === "joker" && c) return `${IMG_BASE}/joker_${c}.png`;
+  if (v === "joker" || v === "+4") return `${IMG_BASE}/${v}.png`;
+  return `${IMG_BASE}/${v}_${c}.png`;
+}
+
+const socket = io();
+let lobbyId = null;
+let myPlayerName = null;
+let oncolorpick = false;
+let lastState = null;
+let wildPending = null; // { index, v, c } — index in hand
+
+function clearTable() {
+  for (const id of ["opponents", "middle", "colorpick", "player1", "hud"]) {
+    const el = document.getElementById(id);
+    if (el) el.replaceChildren();
+  }
+}
+
+function render(state) {
+  if (!state || !myPlayerName) return;
+  lastState = state;
+  clearTable();
+  oncolorpick = false;
+  wildPending = null;
+
+  const me = state.players.find((p) => p.name === myPlayerName);
+  if (!me) return;
+
+  const isMyTurn = state.current === myPlayerName;
+
+  const opEl = document.getElementById("opponents");
+  for (const p of state.players) {
+    if (p.name === myPlayerName) continue;
+    const col = document.createElement("div");
+    col.className = "opponent-col";
+    const cap = document.createElement("div");
+    cap.className = "opponent-name";
+    cap.textContent = p.ordi ? `${p.name} (IA)` : p.name;
+    const row = document.createElement("div");
+    row.className = "opponent-hand";
+    for (let k = 0; k < p.nCards; k += 1) {
+      const im = document.createElement("img");
+      im.src = `${IMG_BASE}/dos.png`;
+      im.alt = "dos";
+      im.width = 50;
+      row.appendChild(im);
     }
-    let imgpath = ""
-    let cart = null
-    let jorder = [...gaming.joueur]
-    let jeur = null
-    for (let j = 0; j < gaming.joueur.length; j += 1){
-        if ("joueur"+id == gaming.joueur[j].nom){
-            cart = gaming.joueur[j].jeu.cartes
-            curJ = gaming.joueur[j]
-            break
-        } else {
-            jeur = jorder.shift()
-            jorder.push(jeur)
-        }
-    }
-    //let cart = [new Carte(1,12),new Carte(3,2),new Carte(1,14),new Carte(0,6),new Carte(2,10)]
-    for (let i = 0; i < cart.length; i += 1){
-        if (cart[i].get_valeur() == "+4" || cart[i].get_valeur() == "joker"){
-            imgpath = `../images_cartes/${cart[i].get_valeur()}.png`
-        }  else {
-            imgpath = `../images_cartes/${cart[i].get_valeur()}_${cart[i].get_couleur()}.png`
-        }
+    col.appendChild(cap);
+    col.appendChild(row);
+    opEl.appendChild(col);
+  }
 
-        const myButton = document.createElement('button');
-
-        const myImage = document.createElement('img');
-
-        // 2. Set the source and other attributes
-        myImage.src = imgpath;
-        myImage.alt = imgpath;
-        myImage.width = 80; // Optional: set width in pixels
-        myImage.id = `${cart[i].get_valeur()}_${cart[i].get_couleur()}_${i}`
-
-        myButton.appendChild(myImage);
-
-        myButton.addEventListener('click', cardclick)
-        
-        // 3. Append it to a container in your HTML (e.g., a <div> with id="container")
-        document.getElementById('player1').appendChild(myButton);
-    }
-    jorder.shift()
-    console.log(jorder[0])
-    while (jorder.length > 0){
-        if (gaming.joueur.length == 2){
-            for (let k = 0; k < jorder[0].jeu.cartes.length; k += 1){
-                const myImage = document.createElement('img');
-                // 2. Set the source and other attributes
-                myImage.src = "../images_cartes/dos.png";
-                myImage.alt = "../images_cartes/dos.png";
-                myImage.width = 50; // Optional: set width in pixels
-        
-                // 3. Append it to a container in your HTML (e.g., a <div> with id="container")
-                document.getElementById('player3').appendChild(myImage);
-            }
-        }
-        jorder.shift()
-    }
-    const myButton = document.createElement('button');
-    let myImage = document.createElement('img');
-    myImage.src = "../images_cartes/tas.png";
-    myImage.alt = "../images_cartes/tas.png";
-    myImage.width = 80; // Optional: set width in pixels
+  for (let i = 0; i < me.hand.length; i += 1) {
+    const { v, c } = me.hand[i];
+    const myButton = document.createElement("button");
+    myButton.type = "button";
+    myButton.dataset.handIndex = String(i);
+    if (!isMyTurn) myButton.disabled = true;
+    const myImage = document.createElement("img");
+    myImage.src = handPath(v, c);
+    myImage.alt = `${v}_${c}`;
+    myImage.width = 80;
+    myImage.draggable = false;
     myButton.appendChild(myImage);
-    myButton.addEventListener('click', pioche);
-    document.getElementById('middle').appendChild(myButton);
+    myButton.addEventListener("click", cardclick);
+    document.getElementById("player1").appendChild(myButton);
+  }
 
-    myImage = document.createElement('img');
-    myImage.src = `../images_cartes/${gaming.tas.devant.get_valeur()}_${gaming.tas.devant.get_couleur()}.png`;
-    myImage.alt = `${gaming.tas.devant.get_valeur()}_${gaming.tas.devant.get_couleur()}`;
-    myImage.width = 60; // Optional: set width in pixels
-    document.getElementById('middle').appendChild(myImage);
-}
+  const mid = document.getElementById("middle");
+  const piocheBtn = document.createElement("button");
+  piocheBtn.type = "button";
+  if (!isMyTurn) piocheBtn.disabled = true;
+  const pimg = document.createElement("img");
+  pimg.src = `${IMG_BASE}/tas.png`;
+  pimg.alt = "pioche";
+  pimg.width = 80;
+  piocheBtn.appendChild(pimg);
+  piocheBtn.addEventListener("click", pioche);
+  mid.appendChild(piocheBtn);
 
-function pick_color(card){
-    const myImag = document.createElement('img');
-    myImag.src = `../images_cartes/font.png`;
-    myImag.alt = `../images_cartes/font.png`;
-    myImag.width = 80; // Optional: set width in pixels
-    const colorpicker = ['rouge', 'bleu', 'vert', 'jaune']
-    document.getElementById('colorpick').appendChild(myImag);
-    for (let i = 0; i < colorpicker.length; i += 1){
-        const myButton = document.createElement('button');
-        const myImage = document.createElement('img');
-        myImage.src = `../images_cartes/${colorpicker[i]}.png`;
-        myImage.alt = `../images_cartes/${colorpicker[i]}.png`;
-        myImage.width = 80; // Optional: set width in pixels
-        myImage.id = colorpicker[i]
-        myButton.appendChild(myImage);
-        myButton.addEventListener('click', (event) => {
-            colorpicked(event, card); // Now you have 3 arguments!
-        });
-        // 3. Append it to a container in your HTML (e.g., a <div> with id="container")
-        document.getElementById('colorpick').appendChild(myButton);
-        // 2. Set the source and other attributes
-    
+  if (state.discard) {
+    const dimg = document.createElement("img");
+    dimg.src = discardPath(state.discard);
+    dimg.alt = "defausse";
+    dimg.width = 60;
+    mid.appendChild(dimg);
+  }
+
+  const hud = document.getElementById("hud");
+  if (hud) {
+    const line = document.createElement("p");
+    line.className = "hud-line";
+    line.textContent = isMyTurn
+      ? "C'est à toi de jouer."
+      : `Tour de : ${state.current || "…"}`;
+    hud.appendChild(line);
+    if (state.victory) {
+      const w = document.createElement("p");
+      w.className = "hud-winner";
+      w.textContent = `Partie terminée — gagnant : ${state.winner || "?"}`;
+      hud.appendChild(w);
     }
-}
-
-function colorpicked(event, card){
-    curJ.jeu.cartes[card[2]] = new Carte(card[1],card[0])
-    gaming.checkpose(curJ, [new Carte(event.target.id,card[0]),card[2]])
-    const container = document.getElementById("colorpick");
-    container.replaceChildren();
-    oncolorpick = false;
-    socket.emit('draw_card', lobbyId)
-    socket.emit('new_turn', lobbyId)
-}
-
-function first_turn(){
-    if (gaming.joueur[0].ordi == true){
-        comp(gaming)
-        socket.emit('draw_card', lobbyId)
-        socket.emit('new_turn', lobbyId)
-    }   
+  }
 }
 
 const cardclick = (event) => {
-    if (oncolorpick == false){
-        if (event.target.id == undefined){
-        socket.emit('draw_card', lobbyId)
-        } else {
-            console.log(event.target.id)
-            let card = event.target.id.split("_")
-            console.log(card)
-            console.log(gaming.joueur)
-            if (curJ.pose(new Carte(card[1],card[0]),gaming.tas.devant,gaming,card[2])){
-                if (card[0] == "+4" || card[0] == "joker"){
-                    oncolorpick = true
-                    pick_color(card)
-                } else {
-                    gaming.checkpose(curJ, [new Carte(card[1],card[0]),card[2]])
-                    socket.emit('draw_card', lobbyId)
-                    socket.emit('new_turn', lobbyId)
-                }
-            }
-        }
-    }
+  if (!lastState || lastState.victory) return;
+  const state = lastState;
+  if (state.current !== myPlayerName || oncolorpick) return;
+  const btn = event.currentTarget;
+  const index = parseInt(btn?.dataset?.handIndex ?? "", 10);
+  if (Number.isNaN(index)) return;
+  const me = state.players.find((p) => p.name === myPlayerName);
+  const card = me?.hand?.[index];
+  if (!card) return;
+  const { v, c } = card;
+  if (v === "joker" || v === "+4") {
+    oncolorpick = true;
+    wildPending = { index: String(index), v, c };
+    pickColorUi();
+  } else {
+    socket.emit("play_card", { lobbyId, index });
+  }
+};
+
+function pickColorUi() {
+  const el = document.getElementById("colorpick");
+  el.replaceChildren();
+  const font = document.createElement("img");
+  font.src = `${IMG_BASE}/font.png`;
+  font.width = 80;
+  el.appendChild(font);
+  const colorpicker = ["rouge", "bleu", "vert", "jaune"];
+  for (const col of colorpicker) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.pickColor = col;
+    const img = document.createElement("img");
+    img.src = `${IMG_BASE}/${col}.png`;
+    img.alt = col;
+    img.width = 80;
+    img.draggable = false;
+    btn.appendChild(img);
+    btn.addEventListener("click", colorpicked);
+    el.appendChild(btn);
+  }
 }
 
-const pioche = (event) => {
-    if (curJ.tour == true){
-        curJ.old_pioche(1,gaming)
-    }
-    socket.emit('draw_card', lobbyId)
-    socket.emit('new_turn', lobbyId)
+function colorpicked(event) {
+  if (!wildPending) return;
+  const btn = event.currentTarget;
+  const color =
+    btn?.dataset?.pickColor ||
+    event.target?.closest?.("button")?.dataset?.pickColor ||
+    event.target?.id;
+  if (!["rouge", "bleu", "vert", "jaune"].includes(color)) return;
+  socket.emit("play_wild", {
+    lobbyId,
+    index: parseInt(wildPending.index, 10),
+    color,
+  });
+  const el = document.getElementById("colorpick");
+  el.replaceChildren();
+  oncolorpick = false;
+  wildPending = null;
 }
 
-const gaming = new Game()
-const socket = io()
-let localLobbies = {}; // This will hold the copy of the server data
-let lobbyId = null;
+const pioche = () => {
+  if (!lastState || lastState.victory) return;
+  if (lastState.current !== myPlayerName) return;
+  socket.emit("draw_card", lobbyId);
+};
 
-socket.emit("gamestarts")
+socket.emit("gamestarts");
 
-socket.on('play_next', () => {
-    gaming.new_turn()
-    if (gaming.joueur[0].ordi == true){
-        comp(gaming)
-        socket.emit('draw_card', lobbyId)
-        socket.emit('new_turn', lobbyId)
-    }
-})
-
-socket.on('init_data', (serverLobbies, lobbyid) => {
-    localLobbies = serverLobbies;
-    lobbyId = lobbyid
-    console.log(localLobbies[lobbyid])
-    console.log("I now have the lobby data!", localLobbies);
-    let cpu = 0
-    if (localLobbies[lobbyId].players.length != localLobbies[lobbyId].maxPlayers){
-        cpu = localLobbies[lobbyId].maxPlayers - localLobbies[lobbyId].players.length
-    }
-    /*let nametab = []
-    for (i = 0; i < localLobbies[lobbyId].players.length; i +=1){
-        nametab.push("Joueur"+i)
-    }
-    */
-    gaming.createjoueur(cpu, localLobbies[lobbyId].maxPlayers)
-    gaming.start()
-    socket.emit('draw_card', lobbyId)
-    first_turn()
+socket.on("init_data", (payload) => {
+  lobbyId = payload.lobbyId;
+  myPlayerName = payload.myPlayerName;
+  if (payload.state) {
+    render(payload.state);
+  }
 });
 
-socket.on('info_draw', (id) => {
-    draw_card(id)
+socket.on("game_state", (state) => {
+  render(state);
 });
-

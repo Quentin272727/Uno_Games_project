@@ -5,7 +5,6 @@ export class Carte{
         valeur (entre 0 et 14).
         j'ai ajouter un converteur en string donc si on tape 'rouge', cela devrai le convertir en int et donc marcher
         */
-       console.log(c + "val" + v)
         if (typeof c == "string"){
             let converted = false
             let i = 0
