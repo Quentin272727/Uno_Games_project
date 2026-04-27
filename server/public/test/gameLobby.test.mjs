@@ -42,6 +42,30 @@ test("lobby 2 humains (salle pleine): 0 IA", () => {
   assert.strictEqual(g.joueur.filter((j) => j.ordi).length, 0);
 });
 
+test("force-fill lobby 4: 1 humain + 3 IA (comme « Rejoindre quand même »)", () => {
+  const id = "force-fill-test-4";
+  deleteGame(id);
+  const lobbies = {
+    [id]: { players: ["sock-human"], maxPlayers: 4 },
+  };
+  const g = ensureGame(id, lobbies);
+  assert.strictEqual(g.joueur.length, 4);
+  assert.strictEqual(g.joueur.filter((j) => !j.ordi).length, 1);
+  assert.strictEqual(g.joueur.filter((j) => j.ordi).length, 3);
+});
+
+test("force-fill lobby 3: 1 humain + 2 IA", () => {
+  const id = "force-fill-test-3";
+  deleteGame(id);
+  const lobbies = {
+    [id]: { players: ["sock-human"], maxPlayers: 3 },
+  };
+  const g = ensureGame(id, lobbies);
+  assert.strictEqual(g.joueur.length, 3);
+  assert.strictEqual(g.joueur.filter((j) => !j.ordi).length, 1);
+  assert.strictEqual(g.joueur.filter((j) => j.ordi).length, 2);
+});
+
 test("statePayload: défausse, tour courant, 2 mains", () => {
   const id = "t-state";
   deleteGame(id);
@@ -87,11 +111,12 @@ test("handlePlayCard: joue une carte jouable (non wild) et diffuse game_state", 
       }
     }
     if (idx < 0) continue;
-    const lenBefore = p.jeu.cartes.length;
     const io = makeIo();
     handlePlayCard(io, { id: "s1" }, lobbies, { lobbyId: id, index: idx });
-    assert.strictEqual(p.jeu.cartes.length, lenBefore - 1);
-    assert.ok(io.emissions.some((e) => e.event === "game_state"));
+    assert.ok(
+      io.emissions.some((e) => e.event === "game_state"),
+      "game_state après une pose (la main peut aussi changer si l'IA enchaîne)",
+    );
     succeeded = true;
     break;
   }

@@ -11,6 +11,7 @@ import {
   handlePlayCard,
   handlePlayWild,
   handleDraw,
+  handleContreUno,
   deleteGame,
 } from "./gameService.js";
 
@@ -148,6 +149,16 @@ io.on("connection", (socket) => {
       handlePlayWild(io, socket, lobbies, payload);
     } catch (err) {
       console.error("Erreur play_wild:", err.message);
+    }
+  });
+
+  socket.on("contre_uno", (payload) => {
+    try {
+      const lobbyId = payload?.lobbyId;
+      if (!lobbyId) return;
+      handleContreUno(io, socket, lobbies, { lobbyId });
+    } catch (err) {
+      console.error("Erreur contre_uno:", err.message);
     }
   });
 
