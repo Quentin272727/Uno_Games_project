@@ -1,5 +1,5 @@
 import { Paquet, Carte, Tas } from './cartes.js';
-import { Joueur } from '../joueur.js';
+import { Joueur } from './joueur.js';
 import{ getRandomInt } from './cusfunc.js';
 export class Game{
     constructor(){
@@ -32,16 +32,13 @@ export class Game{
         }
         return ordre
     }
-    createjoueur(n){
-        /*cree un tableau de n joueur
-        a modifier pour le joueur humain,
-        prendra comme argument n pour le nombre de joueur*/
-        for (let i = 0; i < n; i += 1){
-            if (i == 0){
-                this.joueur.push(new Joueur(true,`joueur${i+1}`))
-            } else{
-                this.joueur.push(new Joueur(true,`joueur${i+1}`))
-            }
+    createjoueur(cpuCount, totalPlayers){
+        /*cree un tableau de totalPlayers joueurs.
+        Les (totalPlayers - cpuCount) premiers joueurs sont humains, les suivants sont des CPUs.*/
+        const humanCount = totalPlayers - cpuCount;
+        for (let i = 0; i < totalPlayers; i += 1){
+            const isOrdi = i >= humanCount; // humans first, then CPUs
+            this.joueur.push(new Joueur(isOrdi, `joueur${i+1}`))
         }
     }
     AI_select_color(prems){

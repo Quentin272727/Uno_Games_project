@@ -5,11 +5,12 @@ export class Carte{
         valeur (entre 0 et 14).
         j'ai ajouter un converteur en string donc si on tape 'rouge', cela devrai le convertir en int et donc marcher
         */
+       console.log(c + "val" + v)
         if (typeof c == "string"){
             let converted = false
             let i = 0
             let color = ['rouge', 'vert', 'jaune', 'bleu']
-            while (converted != true || color.length - 1 < i){
+            while (converted == false && i < color.length){
                 if (c == color[i]){
                     c = i
                     converted = true
@@ -19,10 +20,10 @@ export class Carte{
             assert(converted == true, "Erreur de convertion string couleur")
         }
         if(typeof v == "string"){
-            converted = false
-            i = 0
+            let converted = false
+            let i = 0
             let values = ['0','1','2','3','4','5','6','7','8','9','block','inverse','+2','+4','joker']
-            while (converted != true || color.length - 1 < i){
+            while (converted == false && i < values.length){
                 if (v == values[i]){
                     v = i
                     converted = true
