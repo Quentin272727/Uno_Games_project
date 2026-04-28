@@ -17,6 +17,8 @@ export class Game{
         this.victory = false
         this.gagnant = null
         this.carte_dispo = new Paquet()
+        /** Sur Node : contest contre-UNO géré par le serveur (voir gameService). */
+        this.unoContest = null
     }
     ordredej(){
         /*definit l'ordre des joueurs aleatoirement
@@ -103,6 +105,7 @@ export class Game{
         this.victory = false
         this.tas.reset()
         this.gagnant = null
+        this.unoContest = null
     }
     checkpose(player,c){ //si un joueur click sur une carte cela renvoie le nom du joueur et si sa carte pose est valide, si valide il le posera dans le tas, sinon rien ne se passe
         /*Fonction qui controle si c'est bien a ce jouer si il clique une carte valide
@@ -120,7 +123,7 @@ export class Game{
             player.jeu.retirercarte(c[1])
             this.last_card(player)
             if (player.jeu.cartes.length == 0){
-                this.gagnant = player
+                this.victoire(player)
                 return null
             }
             else {
@@ -236,6 +239,10 @@ export class Game{
     }
     last_card(joueur){ //appelé quand un joueur n'as plus qu'un seule carte
         if (joueur.jeu.cartes.length == 1){
+            if (typeof globalThis === "object" && !globalThis.window) {
+                this.unoContest = { defendingNom: joueur.nom }
+                return
+            }
             let result = this.minigame(joueur)
             if (result.nom != joueur.nom){
                 console.log("Uno lost")
@@ -251,10 +258,6 @@ export class Game{
     }
 
     minigame(joueur){
-        // Le mini-jeu "UNO !" côté navigateur; sur Node, évite une boucle infinie.
-        if (typeof globalThis === "object" && !globalThis.window) {
-            return joueur
-        }
         // afficher le button UNO! du joueur qui vient d'être en uno
         let start = Date.now()
         let press = false

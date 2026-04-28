@@ -13,6 +13,7 @@ import {
   handleDraw,
   handleContreUno,
   deleteGame,
+  syncGameWithLobbySize,
 } from "./gameService.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -98,10 +99,120 @@ app.post("/login", async (req, res) => {
 
 const lobbies = {}; // { lobbyId: { players: [socketId, ...], maxPlayers } }
 
+/** Invitations : seules les connexions depuis la machine du serveur (loopback) peuvent envoyer. */
+const socketByPlayerId = new Map(); // playerId -> socket.id
+const playerIdBySocket = new Map(); // socket.id -> playerId
+const pendingInvites = new Map(); // inviteToken -> { hostSocketId, hostPlayerId, targetPlayerId, joueurs }
+
+function clientAddressIsLoopback(socket) {
+  const raw =
+    socket.handshake?.address ||
+    socket.request?.connection?.remoteAddress ||
+    "";
+  return (
+    raw === "127.0.0.1" ||
+    raw === "::1" ||
+    raw === "::ffff:127.0.0.1"
+  );
+}
+
+function canSendInvite(socket) {
+  if (process.env.UNO_INVITE_ALLOW_ALL === "1") return true;
+  return clientAddressIsLoopback(socket);
+}
+
+function lobbyIdForInvite(hostPlayerId, targetPlayerId, joueurs) {
+  if (joueurs === 2) {
+    return [hostPlayerId, targetPlayerId].sort().join("-");
+  }
+  return hostPlayerId;
+}
+
 // ── Socket.io ────────────────────────────────────────────────────────────────
 
 io.on("connection", (socket) => {
   console.log("Nouvelle connexion :", socket.id);
+
+  socket.on("register-player", ({ playerId }) => {
+    try {
+      if (!playerId || typeof playerId !== "string") return;
+      const pid = playerId.trim().toUpperCase();
+      if (!pid) return;
+      const prevPid = playerIdBySocket.get(socket.id);
+      if (prevPid) socketByPlayerId.delete(prevPid);
+      playerIdBySocket.set(socket.id, pid);
+      socketByPlayerId.set(pid, socket.id);
+    } catch (err) {
+      console.error("Erreur register-player:", err.message);
+    }
+  });
+
+  socket.on("send-invite", ({ targetPlayerId, joueurs }) => {
+    try {
+      if (!canSendInvite(socket)) {
+        socket.emit("invite-error", { reason: "not-host" });
+        return;
+      }
+      const hostPlayerId = playerIdBySocket.get(socket.id);
+      if (!hostPlayerId) return;
+      const tid = String(targetPlayerId || "").trim().toUpperCase();
+      if (!tid || tid === hostPlayerId) {
+        socket.emit("invite-error", { reason: "bad-target" });
+        return;
+      }
+      const j = Number(joueurs);
+      if (![2, 3, 4].includes(j)) {
+        socket.emit("invite-error", { reason: "bad-joueurs" });
+        return;
+      }
+      const targetSid = socketByPlayerId.get(tid);
+      if (!targetSid) {
+        socket.emit("invite-error", { reason: "offline" });
+        return;
+      }
+      const inviteToken = `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+      pendingInvites.set(inviteToken, {
+        hostSocketId: socket.id,
+        hostPlayerId,
+        targetPlayerId: tid,
+        joueurs: j,
+      });
+      io.to(targetSid).emit("invite-offer", {
+        hostPlayerId,
+        joueurs: j,
+        inviteToken,
+      });
+    } catch (err) {
+      console.error("Erreur send-invite:", err.message);
+    }
+  });
+
+  socket.on("invite-response", ({ inviteToken, accepted }) => {
+    try {
+      const inv = pendingInvites.get(inviteToken);
+      if (!inv) return;
+      const responderPid = playerIdBySocket.get(socket.id);
+      if (responderPid !== inv.targetPlayerId) return;
+      pendingInvites.delete(inviteToken);
+
+      const hostSocket = io.sockets.sockets.get(inv.hostSocketId);
+      if (!accepted) {
+        if (hostSocket) hostSocket.emit("invite-declined");
+        return;
+      }
+
+      const lobbyId = lobbyIdForInvite(
+        inv.hostPlayerId,
+        inv.targetPlayerId,
+        inv.joueurs,
+      );
+      const payload = { lobbyId, maxPlayers: inv.joueurs };
+      if (hostSocket) hostSocket.emit("invite-accepted", payload);
+      socket.emit("invite-accepted", payload);
+    } catch (err) {
+      console.error("Erreur invite-response:", err.message);
+    }
+  });
 
   socket.on("join-lobby", ({ lobbyId, maxPlayers }) => {
     try {
@@ -115,8 +226,26 @@ io.on("connection", (socket) => {
       });
       if (lobbies[lobbyId].players.length === lobbies[lobbyId].maxPlayers)
         io.to(lobbyId).emit("start-game");
+      syncGameWithLobbySize(io, lobbyId, lobbies);
     } catch (err) {
       console.error("Erreur join-lobby:", err.message);
+    }
+  });
+
+  /** Un joueur du salon lance la partie : tout le monde (même room Socket.IO) est redirigé vers /jeux. */
+  socket.on("lobby-force-start", ({ lobbyId, maxPlayers }) => {
+    try {
+      const lobby = lobbies[lobbyId];
+      if (!lobby || !lobby.players.includes(socket.id)) return;
+      const mp = Number(maxPlayers);
+      const safeMp =
+        Number.isFinite(mp) && mp >= 1 ? mp : lobby.maxPlayers;
+      io.to(lobbyId).emit("lobby-force-start-go", {
+        lobbyId,
+        maxPlayers: safeMp,
+      });
+    } catch (err) {
+      console.error("Erreur lobby-force-start:", err.message);
     }
   });
 
@@ -164,6 +293,20 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     try {
+      const pid = playerIdBySocket.get(socket.id);
+      if (pid) {
+        socketByPlayerId.delete(pid);
+        playerIdBySocket.delete(socket.id);
+      }
+      for (const [token, inv] of pendingInvites.entries()) {
+        if (
+          inv.hostSocketId === socket.id ||
+          inv.targetPlayerId === pid
+        ) {
+          pendingInvites.delete(token);
+        }
+      }
+
       for (const lobbyId in lobbies) {
         const lobby = lobbies[lobbyId];
         lobby.players = lobby.players.filter((id) => id !== socket.id);

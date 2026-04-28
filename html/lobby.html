@@ -1,28 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/css/styles_lob.css">
+  <link rel="stylesheet" href="/css/main.css">
+  <title>Lobby UNO</title>
+</head>
 <body>
 
   <h1>Lobby</h1>
 
-  <!-- Zone affichage id -->
   <div style="margin-bottom: 20px;">
     <strong>Ton ID :</strong> <span id="my-id"></span>
   </div>
 
-  <!-- barre pour rentrer l'id d'un ami  -->
   <div style="margin-bottom: 20px;">
-    <link rel="stylesheet" href="/css/styles_lob.css">
-    <input id="friend-id" placeholder="ID de ton ami">
-    <button onclick="joinFriendLobby()">Rejoindre</button>
+    <input id="friend-id" maxlength="12" autocomplete="off" />
+    <button type="button" id="btn-lobby-action">Rejoindre</button>
   </div>
+
+  <p id="lobby-room-hint" class="lobby-hint" style="display:none; max-width: 42rem; font-size:0.9rem; margin: 0 0 1rem 0; line-height:1.4;"></p>
 
   <div id="lobby"></div>
 
-  <button id="force-start" style="margin-top:20px; display:none;">
-  Rejoindre la partie quand même
+  <button id="force-start" type="button" style="margin-top:20px; display:none;">
+    Rejoindre la partie quand même
   </button>
+
+  <div id="invite-modal" class="invite-modal" hidden role="dialog" aria-modal="true" aria-labelledby="invite-modal-title">
+    <div class="invite-modal__backdrop" id="invite-modal-backdrop"></div>
+    <div class="invite-modal__box">
+      <h2 id="invite-modal-title" class="invite-modal__title">Invitation</h2>
+      <p class="invite-modal__msg">Une personne souhaite vous inviter. Souhaitez-vous la rejoindre ?</p>
+      <p class="invite-modal__meta">Salon : <strong id="invite-modal-nb">—</strong> joueurs — Invitant : <strong id="invite-modal-host">—</strong></p>
+      <div class="invite-modal__actions">
+        <button type="button" id="invite-accept" class="invite-modal__btn invite-modal__btn--ok">Accepter</button>
+        <button type="button" id="invite-refuse" class="invite-modal__btn invite-modal__btn--no">Refuser</button>
+      </div>
+    </div>
+  </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-  // génération & récup de l'id
   function generateId() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   }
@@ -35,25 +55,193 @@
 
   document.getElementById("my-id").textContent = myId;
 
- 
   const params = new URLSearchParams(window.location.search);
   const nb = parseInt(params.get("joueurs"), 10) || 2;
 
+  function isLocalHostPage() {
+    const h = window.location.hostname;
+    return h === "localhost" || h === "127.0.0.1";
+  }
+
+  const socket = io();
+  let currentLobbyId = null;
+  let pendingInviteToken = null;
+
+  const friendInput = document.getElementById("friend-id");
+  const actionBtn = document.getElementById("btn-lobby-action");
+
+  socket.on("connect", () => {
+    socket.emit("register-player", { playerId: myId });
+    const raw = sessionStorage.getItem("unoLobbyJoin");
+    if (raw) {
+      try {
+        const j = JSON.parse(raw);
+        currentLobbyId = j.lobbyId;
+        socket.emit("join-lobby", {
+          lobbyId: j.lobbyId,
+          maxPlayers: j.maxPlayers,
+        });
+      } catch (e) {}
+    }
+  });
+
+  const hintEl = document.getElementById("lobby-room-hint");
+  if (hintEl && nb > 1) {
+    hintEl.style.display = "block";
+    if (isLocalHostPage()) {
+      hintEl.innerHTML =
+        "<strong>Hôte :</strong> entre l’<strong>ID</strong> du joueur (affiché chez lui sous « Ton ID »), puis clique <strong>Inviter</strong>. Tu peux ensuite utiliser <strong>Rejoindre la partie quand même</strong> pour compléter avec des bots si la salle n’est pas pleine.";
+    } else if (nb === 3 || nb === 4) {
+      hintEl.innerHTML =
+        "<strong>Invité :</strong> une personne est l’<strong>hôte</strong>. Entre le <strong>même</strong> ID de salle que tout le monde : l’ID de l’hôte (ou le tien si tu es hôte sur une autre machine). Puis <strong>Rejoindre</strong>, puis si besoin <strong>Rejoindre la partie quand même</strong> avec des bots.";
+    } else {
+      hintEl.innerHTML =
+        "<strong>Invité :</strong> entre l’<strong>ID</strong> de ton ami, puis <strong>Rejoindre</strong>.";
+    }
+  }
+
+  if (nb > 1 && actionBtn && friendInput) {
+    if (isLocalHostPage()) {
+      actionBtn.textContent = "Inviter";
+      friendInput.placeholder = "ID du joueur à inviter";
+      actionBtn.addEventListener("click", sendInviteFromLobby);
+    } else {
+      actionBtn.textContent = "Rejoindre";
+      friendInput.placeholder =
+        nb === 3 || nb === 4
+          ? "ID hôte (invité) ou laisse vide (hôte)"
+          : "ID de ton ami";
+      actionBtn.addEventListener("click", joinFriendLobby);
+    }
+  }
+
+  function sendInviteFromLobby() {
+    const target = friendInput.value.trim().toUpperCase();
+    if (!target) {
+      alert("Entre l’ID du joueur à inviter.");
+      return;
+    }
+    socket.emit("send-invite", { targetPlayerId: target, joueurs: nb });
+  }
+
+  const modal = document.getElementById("invite-modal");
+  const modalNb = document.getElementById("invite-modal-nb");
+  const modalHost = document.getElementById("invite-modal-host");
+
+  function closeInviteModal() {
+    modal.hidden = true;
+    pendingInviteToken = null;
+  }
+
+  socket.on("invite-offer", ({ hostPlayerId, joueurs, inviteToken }) => {
+    pendingInviteToken = inviteToken;
+    modalNb.textContent = String(joueurs);
+    modalHost.textContent = hostPlayerId || "—";
+    modal.hidden = false;
+  });
+
+  document.getElementById("invite-accept").addEventListener("click", () => {
+    if (!pendingInviteToken) return;
+    socket.emit("invite-response", {
+      inviteToken: pendingInviteToken,
+      accepted: true,
+    });
+    closeInviteModal();
+  });
+
+  document.getElementById("invite-refuse").addEventListener("click", () => {
+    if (!pendingInviteToken) return;
+    socket.emit("invite-response", {
+      inviteToken: pendingInviteToken,
+      accepted: false,
+    });
+    closeInviteModal();
+  });
+
+  document.getElementById("invite-modal-backdrop").addEventListener("click", () => {
+    if (pendingInviteToken) {
+      socket.emit("invite-response", {
+        inviteToken: pendingInviteToken,
+        accepted: false,
+      });
+    }
+    closeInviteModal();
+  });
+
+  socket.on("invite-accepted", ({ lobbyId, maxPlayers }) => {
+    sessionStorage.setItem(
+      "unoLobbyJoin",
+      JSON.stringify({ lobbyId, maxPlayers }),
+    );
+    window.location.href = "/lobby?joueurs=" + maxPlayers;
+  });
+
+  socket.on("invite-declined", () => {
+    alert("Le joueur a décliné votre demande.");
+  });
+
+  socket.on("invite-error", ({ reason }) => {
+    if (reason === "offline") {
+      alert("Ce joueur n’est pas connecté ou l’ID est incorrect.");
+    } else if (reason === "not-host") {
+      alert("Seul l’hôte (page ouverte en 127.0.0.1 sur le PC du serveur) peut envoyer une invitation.");
+    } else if (reason === "bad-target") {
+      alert("ID invité invalide.");
+    } else if (reason === "bad-joueurs") {
+      alert("Nombre de joueurs invalide.");
+    } else {
+      alert("Impossible d’envoyer l’invitation.");
+    }
+  });
+
+  /** Celui qui a cliqué « Rejoindre la partie quand même » notifie le serveur ; tout le salon part en jeu. */
+  socket.on("lobby-force-start-go", ({ lobbyId: lid, maxPlayers: mp }) => {
+    currentLobbyId = lid;
+    sessionStorage.setItem(
+      "unoLobbyJoin",
+      JSON.stringify({ lobbyId: lid, maxPlayers: mp }),
+    );
+    window.location.href = "/jeux";
+  });
+
   if (nb > 1) {
     document.getElementById("force-start").addEventListener("click", () => {
-      // Join a solo lobby under the player's own ID so the server knows about us
-      currentLobbyId = "solo-" + myId;
-      socket.emit("join-lobby", { lobbyId: currentLobbyId, maxPlayers: 2 });
-      setTimeout(() => { window.location.href = "/jeux"; }, 100);
+      const roomId = sharedRoomIdForGame();
+      if (roomId === null) return;
+      currentLobbyId = roomId;
+      socket.emit("join-lobby", { lobbyId: currentLobbyId, maxPlayers: nb });
+      socket.emit("lobby-force-start", {
+        lobbyId: currentLobbyId,
+        maxPlayers: nb,
+      });
     });
-  document.getElementById("force-start").style.display = "block";
-}
+    document.getElementById("force-start").style.display = "block";
+  }
 
+  function sharedRoomIdForGame() {
+    const f = friendInput.value.trim();
+    if (nb === 2) {
+      if (!f) {
+        if (
+          !confirm(
+            "Aucun ID d’ami : tu lances une partie seul avec 1 bot (salon 2). Continuer ?",
+          )
+        )
+          return null;
+        return "force-fill-solo-" + myId + "-" + nb;
+      }
+      return [myId, f].sort().join("-");
+    }
+    if (nb === 3 || nb === 4) {
+      return f || myId;
+    }
+    return "force-fill-" + myId + "-" + nb;
+  }
 
   const lobby = document.getElementById("lobby");
   lobby.classList.add("lobby-" + nb);
 
-  for (let i = 1; i <= nb; i++) {
+  for (let i = 1; i <= nb; i += 1) {
     const div = document.createElement("div");
     div.className = "joueur";
     div.dataset.index = i;
@@ -64,41 +252,39 @@
     lobby.appendChild(div);
   }
 
-  // ajouter socket.io (définir)
-  const socket = io();
-
   socket.on("start-game", () => {
-  window.location.href = "/jeux";
-});
-
-
-  let currentLobbyId = null;
-
-  // Fonction pour rejoindre un lobby privé
-function joinFriendLobby() {
-  if (nb === 1) {
+    if (currentLobbyId) {
+      sessionStorage.setItem(
+        "unoLobbyJoin",
+        JSON.stringify({ lobbyId: currentLobbyId, maxPlayers: nb }),
+      );
+    }
     window.location.href = "/jeux";
-    return;
+  });
+
+  function joinFriendLobby() {
+    if (nb === 1) {
+      window.location.href = "/jeux";
+      return;
+    }
+
+    const friendId = friendInput.value.trim();
+
+    if (nb === 2) {
+      if (!friendId) {
+        return alert("Entre l'ID de ton ami (lance le jeu à 2 humains).");
+      }
+      currentLobbyId = [myId, friendId].sort().join("-");
+    } else if (nb === 3 || nb === 4) {
+      currentLobbyId = friendId || myId;
+    } else {
+      if (!friendId) return alert("Entre l'ID de ton ami");
+      currentLobbyId = [myId, friendId].sort().join("-");
+    }
+
+    socket.emit("join-lobby", { lobbyId: currentLobbyId, maxPlayers: nb });
   }
 
-  const friendId = document.getElementById("friend-id").value.trim();
-  if (!friendId) return alert("Entre l'ID de ton ami");
-
-  if (nb === 2) {
-    // LOBBY 2 JOUEURS 
-    currentLobbyId = [myId, friendId].sort().join("-");
-  }
-
-  if (nb === 3 || nb === 4) {
-    // LOBBY 3 ET 4 JOUEURS  basé sur un ID maître
-    currentLobbyId = friendId;
-  }
-
-  socket.emit("join-lobby", { lobbyId: currentLobbyId, maxPlayers: nb });
-}
-
-
-  // Mise à jour du lobby
   socket.on("lobby-state", ({ playersCount }) => {
     const joueurs = document.querySelectorAll(".joueur");
     console.log("État lobby reçu :", playersCount);
@@ -110,10 +296,7 @@ function joinFriendLobby() {
         div.innerHTML = `<strong>Joueur ${index + 1}</strong><br>En attente...`;
       }
     });
-
-});
-
-
+  });
 </script>
 
 </body>

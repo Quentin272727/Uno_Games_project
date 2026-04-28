@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -26,24 +26,42 @@
 
         <br><br>
 
-        <button onclick="valider()">Valider</button>
+        <button type="button" onclick="valider()">Valider</button>
 
         <br><br>
 
         <p>Ton ID : <span id="my-id"></span></p>
 
+        <p class="main-invite-note" style="margin-top:1rem; font-size:0.92rem; max-width:36rem; line-height:1.45;">
+            Pour inviter quelqu’un, choisis le nombre de joueurs puis <strong>Valider</strong> : sur l’écran <strong>Lobby</strong>, le bouton <strong>Inviter</strong> (hôte, 127.0.0.1) ou <strong>Rejoindre</strong> (invité) permet de lancer ou rejoindre la salle.
+        </p>
+
+        <div id="invite-modal" class="invite-modal" hidden role="dialog" aria-modal="true" aria-labelledby="invite-modal-title">
+            <div class="invite-modal__backdrop" id="invite-modal-backdrop"></div>
+            <div class="invite-modal__box">
+                <h2 id="invite-modal-title" class="invite-modal__title">Invitation</h2>
+                <p class="invite-modal__msg">Une personne souhaite vous inviter. Souhaitez-vous la rejoindre ?</p>
+                <p class="invite-modal__meta">Salon : <strong id="invite-modal-nb">—</strong> joueurs — Invitant : <strong id="invite-modal-host">—</strong></p>
+                <div class="invite-modal__actions">
+                    <button type="button" id="invite-accept" class="invite-modal__btn invite-modal__btn--ok">Accepter</button>
+                    <button type="button" id="invite-refuse" class="invite-modal__btn invite-modal__btn--no">Refuser</button>
+                </div>
+            </div>
+        </div>
+
+        <script src="/socket.io/socket.io.js"></script>
         <script>
             function valider() {
-            const nb = document.getElementById("nbJoueurs").value;
-            if (nb == 1) {
-                window.location.href = "jeux";
-                return;
+                const nb = document.getElementById("nbJoueurs").value;
+                if (nb == 1) {
+                    window.location.href = "jeux";
+                    return;
+                }
+                window.location.href = "lobby?joueurs=" + nb;
             }
-            // on envoie la valeur vers la page lobby
-            window.location.href = "lobby?joueurs=" + nb;
-            }
+
             function generateId() {
-                 return Math.random().toString(36).substring(2, 8).toUpperCase();
+                return Math.random().toString(36).substring(2, 8).toUpperCase();
             }
 
             let myId = localStorage.getItem("playerId");
@@ -54,6 +72,82 @@
 
             document.getElementById("my-id").textContent = myId;
 
+            const socket = io();
+            let pendingInviteToken = null;
+
+            socket.on("connect", () => {
+                socket.emit("register-player", { playerId: myId });
+            });
+
+            const modal = document.getElementById("invite-modal");
+            const modalNb = document.getElementById("invite-modal-nb");
+            const modalHost = document.getElementById("invite-modal-host");
+
+            function closeInviteModal() {
+                modal.hidden = true;
+                pendingInviteToken = null;
+            }
+
+            socket.on("invite-offer", ({ hostPlayerId, joueurs, inviteToken }) => {
+                pendingInviteToken = inviteToken;
+                modalNb.textContent = String(joueurs);
+                modalHost.textContent = hostPlayerId || "—";
+                modal.hidden = false;
+            });
+
+            document.getElementById("invite-accept").addEventListener("click", () => {
+                if (!pendingInviteToken) return;
+                socket.emit("invite-response", {
+                    inviteToken: pendingInviteToken,
+                    accepted: true,
+                });
+                closeInviteModal();
+            });
+
+            document.getElementById("invite-refuse").addEventListener("click", () => {
+                if (!pendingInviteToken) return;
+                socket.emit("invite-response", {
+                    inviteToken: pendingInviteToken,
+                    accepted: false,
+                });
+                closeInviteModal();
+            });
+
+            document.getElementById("invite-modal-backdrop").addEventListener("click", () => {
+                if (pendingInviteToken) {
+                    socket.emit("invite-response", {
+                        inviteToken: pendingInviteToken,
+                        accepted: false,
+                    });
+                }
+                closeInviteModal();
+            });
+
+            socket.on("invite-accepted", ({ lobbyId, maxPlayers }) => {
+                sessionStorage.setItem(
+                    "unoLobbyJoin",
+                    JSON.stringify({ lobbyId, maxPlayers }),
+                );
+                window.location.href = "/lobby?joueurs=" + maxPlayers;
+            });
+
+            socket.on("invite-declined", () => {
+                alert("Le joueur a décliné votre demande.");
+            });
+
+            socket.on("invite-error", ({ reason }) => {
+                if (reason === "offline") {
+                    alert("Ce joueur n’est pas connecté ou l’ID est incorrect.");
+                } else if (reason === "not-host") {
+                    alert("Seul l’hôte (page ouverte en 127.0.0.1 sur le PC du serveur) peut envoyer une invitation.");
+                } else if (reason === "bad-target") {
+                    alert("ID invité invalide.");
+                } else if (reason === "bad-joueurs") {
+                    alert("Nombre de joueurs invalide.");
+                } else {
+                    alert("Impossible d’envoyer l’invitation.");
+                }
+            });
         </script>
     </main>
 </body>

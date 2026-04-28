@@ -14,6 +14,20 @@ export function deleteGame(lobbyId) {
   games.delete(lobbyId);
 }
 
+/** Quand le nombre de humains en salle (sockets) ne matche plus la partie (ex. 1er parti seul, 2e rejoint), on recrée. */
+export function syncGameWithLobbySize(io, lobbyId, lobbies) {
+  const lobby = lobbies[lobbyId];
+  if (!lobby) return;
+  const g = games.get(lobbyId);
+  if (!g) return;
+  const humansInLobby = lobby.players.length;
+  const humansInGame = g.joueur.filter((j) => !j.ordi).length;
+  if (humansInLobby !== humansInGame) {
+    deleteGame(lobbyId);
+    io.to(lobbyId).emit("game_reset");
+  }
+}
+
 export function ensureGame(lobbyId, lobbies) {
   const lobby = lobbies[lobbyId];
   if (!lobby) return null;
