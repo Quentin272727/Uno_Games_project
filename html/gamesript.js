@@ -253,7 +253,7 @@ const cardclick = (event) => {
 function pickColorUi() {
   const el = document.getElementById("colorpick");
   el.replaceChildren();
-  const colorpicker = ["rouge", "bleu", "vert", "jaune"];
+  const colorpicker = ["rouge", "bleu", "vert", "jaune"]; // colors available 
   for (const col of colorpicker) {
     const btn = document.createElement("button");
     btn.type = "button";
