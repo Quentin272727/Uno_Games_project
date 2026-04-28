@@ -31,10 +31,10 @@ const io = new SocketIOServer(httpServer, {
   cors: { origin: "*" },
 });
 
-// Servir les fichiers statiques depuis la racine du projet
+// Serve static files from the project root
 app.use(express.static(path.join(__dirname, "../..")));
 
-// ── Page routes ──────────────────────────────────────────────────────────────
+// for Page routes 
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../../html/main.html"));
@@ -55,7 +55,7 @@ app.get("/lobby", (req, res) => {
   res.sendFile(path.join(__dirname, "../../html/lobby.html"));
 });
 
-// ── Auth routes ──────────────────────────────────────────────────────────────
+// the routes
 
 app.post("/register", async (req, res) => {
   const { username, password } = req.body;
@@ -95,11 +95,11 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// ── Lobby / game memory ──────────────────────────────────────────────────────
+// lobby and manage memory
 
 const lobbies = {}; // { lobbyId: { players: [socketId, ...], maxPlayers } }
 
-/** Invitations : seules les connexions depuis la machine du serveur (loopback) peuvent envoyer. */
+/** Invitations: only logins from the server machine (loopback) can send. */
 const socketByPlayerId = new Map(); // playerId -> socket.id
 const playerIdBySocket = new Map(); // socket.id -> playerId
 const pendingInvites = new Map(); // inviteToken -> { hostSocketId, hostPlayerId, targetPlayerId, joueurs }
@@ -128,7 +128,7 @@ function lobbyIdForInvite(hostPlayerId, targetPlayerId, joueurs) {
   return hostPlayerId;
 }
 
-// ── Socket.io ────────────────────────────────────────────────────────────────
+// gestion du  Socket.io 
 
 io.on("connection", (socket) => {
   console.log("Nouvelle connexion :", socket.id);
@@ -232,7 +232,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  /** Un joueur du salon lance la partie : tout le monde (même room Socket.IO) est redirigé vers /jeux. */
+  /** A player from the lounge starts the game: everyone (even room Socket.IO) is redirected to /games.*/
   socket.on("lobby-force-start", ({ lobbyId, maxPlayers }) => {
     try {
       const lobby = lobbies[lobbyId];
@@ -330,9 +330,9 @@ io.on("connection", (socket) => {
   });
 });
 
-// ── Global crash guards ──────────────────────────────────────────────────────
 
-process.on("unhandledRejection", (reason) => {
+
+process.on("unhandledRejection", (reason) => { 
   console.error("Unhandled promise rejection:", reason);
   // log only — do NOT exit
 });
@@ -342,7 +342,7 @@ process.on("uncaughtException", (err) => {
   // log only — do NOT exit
 });
 
-// ── Start ────────────────────────────────────────────────────────────────────
+// start
 
 const port = Number(process.env.PORT) || 8000;
 httpServer.listen(port, "0.0.0.0", () => {

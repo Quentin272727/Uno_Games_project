@@ -149,7 +149,7 @@ export class Tas{
         this.devant = neww
     }
     reset(){
-        //A utiliser a la fin de partie, vide le tas
+        // vide le tas (fin de partie)
         this.devant = null
         this.endessous = null
     }
