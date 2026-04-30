@@ -1,5 +1,5 @@
 import { Game } from "../../UNO/game.js";
-import { Carte } from "../../UNO/cartes.js";
+import { Carte, Paquet } from "../../UNO/cartes.js";
 import { comp } from "../../UNO/cpu.js";
 
 const games = new Map();
@@ -51,11 +51,14 @@ export function statePayload(g) {
       name: j.nom,
       ordi: j.ordi,
       nCards: j.jeu.cartes.length,
+      points: j.points,
       hand: j.jeu.cartes.map((c) => ({ v: c.get_valeur(), c: c.get_couleur() })),
     })),
     victory: g.victory,
     winner: g.gagnant && g.gagnant.nom ? g.gagnant.nom : g.gagnant,
+    pts: g.gagnant && g.roundpoints ? g.roundpoints : "?",
     unoContest: uc ? { defendingNom: uc.defendingNom } : null,
+    reset : g.reseting,
   };
 }
 
@@ -226,3 +229,26 @@ export function handleDraw(io, socket, lobbies, lobbyId) {
   broadcastState(io, lobbyId);
   runCpuChain(io, lobbyId, lobbies);
 }
+
+export function reset_game(io, socket, lobbies, lobbyId){
+  const lobby = lobbies[lobbyId];
+  const g = games.get(lobbyId)
+  if (!lobby || !g) return;
+  for (let i = 0; i < g.joueur.length; i += 1){
+    g.joueur[i].jeu = new Paquet()
+  }
+  g.start()
+  broadcastState(io, lobbyId)
+  runCpuChain(io, lobbyId, lobbies);
+}
+
+export function waiting(io, socket, lobbies, lobbyId){
+  const lobby = lobbies[lobbyId];
+  const g = games.get(lobbyId)
+  if (!lobby || !g) return;
+  setTimeout(() => {
+    g.reset()
+    broadcastState(io, lobbyId)}, 5000)
+}
+
+

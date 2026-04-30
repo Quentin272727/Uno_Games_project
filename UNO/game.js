@@ -17,8 +17,10 @@ export class Game{
         this.victory = false
         this.gagnant = null
         this.carte_dispo = new Paquet()
-        /** Sur Node : contest contre-UNO géré par le serveur (voir gameService). */
+        // Sur Node : contest contre-UNO géré par le serveur (voir gameService).
         this.unoContest = null
+        this.reseting = false
+        this.roundpoints = 0
     }
     ordredej(){
         /*definit l'ordre des joueurs aleatoirement
@@ -49,6 +51,7 @@ export class Game{
         (car les cpus jouent les cartes couleurs en priorite)*/
         let newcolorlist = ['rouge', 'vert', 'jaune', 'bleu']
         let newcolor = 0
+        // prems est vrai si la toute première carte du jeu est a joker/+4 et donc les cpus peuvent utiliser toutes les couleurs
         if (prems == false){
             let ejected = null
             let x = 0
@@ -74,19 +77,15 @@ export class Game{
         ensuite fait l'action de la premiere carte sur lepremier joueur 
         et met la condition true au joueur au quelle cela va etre le tour*/
         this.etape = 'debut'
+        this.reseting = false
         this.carte_dispo.start_cartes_de_jeu()
-        console.log("1")
         this.tas.start(this)
-        console.log("2")
         for (let i = 0; i < this.joueur.length; i += 1){
             this.joueur[i].jeu.start(this)
         }
-        console.log("3")
         this.joueur = this.ordredej()
-        console.log("4")
         this.etape = "attente d'action"
         this.checkcarteaction(this.tas.devant,true)
-        console.log("5")
         this.joueur[0].tour = true
     }
     IAstart(){
@@ -98,7 +97,7 @@ export class Game{
     }
     reset(){
         /*Reset la partie, vide le tas, remet le nombre de tour,le gagnant,et la victoire a 0 
-        Attention, les statistiques des joueurs sont conserve, aka nbr de pts, le nom, les joueurs dans la partie
+        Attention, les statistiques des joueurs sont conservé, aka nbr de pts, le nom, les joueurs dans la partie
         a utiliser donc pour rejouer*/
         this.etape = 'reset'
         this.nbrtour = 0
@@ -106,14 +105,19 @@ export class Game{
         this.tas.reset()
         this.gagnant = null
         this.unoContest = null
+        this.reseting = true
+        this.roundpoints = 0
+        for (let i = 0; i < this.joueur.length; i += 1){
+            this.joueur[i].reset()
+        }
     }
     checkpose(player,c){ //si un joueur click sur une carte cela renvoie le nom du joueur et si sa carte pose est valide, si valide il le posera dans le tas, sinon rien ne se passe
-        /*Fonction qui controle si c'est bien a ce jouer si il clique une carte valide
-        Si oui,le tour du joueur est directement mis a false (comme caonne peut pas clique plusieurs cartes)
+        /*Fonction qui controle si c'est bien a ce joueur de joué et si il clique une carte valide
+        Si oui,le tour du joueur est directement mis a false (comme ça on ne peut pas cliquer plusieurs cartes)
         elle retire ensuite la carte du joueur et le met dans le tas
-        la fonction va d'abord regarder si le joueur gagne apres avoir deposer sa carte (j'aurais peut etre du attendre de faire l'action d'abordcomme ca en cas de +2 et +4 ongagne + de pts)
+        la fonction va d'abord regarder si le joueur gagne apres avoir deposé sa carte
         si le joueur ne gagne pas, le jeu va voir si sa carte fais une action
-        Prend 3 argument, le joueur qui a clique ou l'ordi qui joue la carte, puis la carte selectionne et son rang*/
+        Prend 2 argument, le joueur qui a cliqué ou l'ordi qui joue la carte, puis la carte selectionne et son rang (dans un tableau "c")*/
         if (player.tour == true)
             if (c == null){
                 return null
@@ -131,11 +135,11 @@ export class Game{
             }
     }
     action(c=null){
-        /*Il y a deux moyen d'arriver ici, soit en piochant dans quelle cas cette fonctionfera rien et passera au prochain tour (avec la boucle while dans l'execution)
+        /*Il y a deux moyen d'arriver ici, soit en piochant dans quelle cas cette fonction fera rien et passera au prochain tour
         soit que le joueur a pose sa carte et que c'est son tour, dans ce cas la fonction renvoie a une autre fonction pour faire l'action de la carte
         Prend comme argument une carte auquel l'action va etre executer, si aucune carte n'est donne (par la pioche) rien ne se passe"""
         #apres que le joueur aient jouer ca carte, cette fonction regardera si la carte pose doit faire une action(pour les carte specialcomme +4) puis change de tour
-        # si aucune carte n'est donne (pioche) le tour passe au joueur suivant directement*/
+        # si aucune carte n'est donné (pioche) le tour passe au joueur suivant directement*/
         if (c !=null){
             this.checkcarteaction(c)
         }
@@ -189,9 +193,10 @@ export class Game{
                 }
             }
         }
+        // fais skip le tour du joueur suivant
         if (c.get_valeur() == "block" || c.get_valeur() == "+4" || c.get_valeur() == "+2"){
             this.joueur[0].tour = false
-            let temp = this.joueur[0] //skip le tour du joueur suivant
+            let temp = this.joueur[0]
             this.joueur.splice(0,1)
             this.joueur.push(temp)
         }
@@ -229,14 +234,15 @@ export class Game{
     victoire(joueur){
         /*En cas de victoire, met que le jeu a trouver un gagnant et calcule sont score
         prend comme argument le joueur gagnant
-        calcul de points, menu de victoire, retirer les cartes
-        print('yey')*/
-        joueur.addpoint(this.calculscore(joueur))
+        calcul de points, menu de victoire, retirer les cartes*/
+        this.roundpoints = this.calculscore(joueur)
+        joueur.addpoint(this.roundpoints)
         this.victory = true
-        this.gagnant = joueur.nom
+        this.gagnant = joueur
         console.log("le gagant est: " + joueur.nom + " pts: " + joueur.points)
         //self.tas.reset()
     }
+    
     last_card(joueur){ //appelé quand un joueur n'as plus qu'un seule carte
         if (joueur.jeu.cartes.length == 1){
             if (typeof globalThis === "object" && !globalThis.window) {
@@ -259,8 +265,10 @@ export class Game{
 
     minigame(joueur){
         // afficher le button UNO! du joueur qui vient d'être en uno
+        // note: le joueur qui se défend à 200ms d'avantage.
         let start = Date.now()
         let press = false
+        // initie le timing des cpu, (donc quand il "clique le contre-uno")
         for (let j = 0; j < this.joueur.length; j += 1){
             if (joueur.nom == this.joueur[j].nom && this.joueur[j].ordi == true){
                 joueur.timing = 150 + getRandomInt(1000)

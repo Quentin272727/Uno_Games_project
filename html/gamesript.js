@@ -41,7 +41,7 @@ function buildOpponentCol(p) {
   col.className = "opponent-col";
   const cap = document.createElement("div");
   cap.className = "opponent-name";
-  cap.textContent = p.ordi ? `${p.name} (IA)` : p.name;
+  cap.textContent = p.ordi ? `${p.name} (IA) pts: ${p.points}` : `${p.name} pts: ${p.points}`;
   const row = document.createElement("div");
   row.className = "opponent-hand";
   for (let k = 0; k < p.nCards; k += 1) {
@@ -145,6 +145,9 @@ function onContreFixedClick() {
 
 function render(state) {
   if (!state || !myPlayerName) return;
+  if (state.reset){
+    socket.emit("game_restart", lobbyId)
+  }
   lastState = state;
   setupFixedActions();
   clearTable();
@@ -161,6 +164,10 @@ function render(state) {
   renderOpponentSeats(state, myPlayerName);
 
   const handEl = document.getElementById("player1");
+  const cap = document.createElement("div");
+  cap.className = "Player-name";
+  cap.textContent = `Toi pts: ${me.points}`;
+  handEl.appendChild(cap)
   for (let i = 0; i < me.hand.length; i += 1) {
     const { v, c } = me.hand[i];
     const myButton = document.createElement("button");
@@ -222,8 +229,13 @@ function render(state) {
     if (state.victory) {
       const w = document.createElement("p");
       w.className = "hud-winner";
-      w.textContent = `Partie terminée — gagnant : ${state.winner || "?"}`;
+      w.textContent = `Partie terminée — gagnant : ${state.winner || "?"} avec ${state.pts || "?"} pts`;
       hud.appendChild(w);
+      const u = document.createElement("p");
+      u.className = "hud-winner";
+      u.textContent = `le jeu redemarrera dans 5 secondes`;
+      hud.appendChild(u);
+      socket.emit("on_cd", lobbyId)
     }
   }
 

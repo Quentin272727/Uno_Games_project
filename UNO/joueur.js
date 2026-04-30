@@ -36,6 +36,13 @@ export class Joueur{
         return null
     }
 
+    reset(){
+        this.jeu = new Paquet()
+        this.uno = false
+        this.tour = false
+        this.timing = -1
+    }
+
     old_pioche(n,g){ //comme la fonction pose, si on clique sur la pioche, cela revoira a cette fonction
         //Si cette fonction est appele, ajoute une n cartes au joueur
         if (this.tour == true){
@@ -129,7 +136,8 @@ export class Joueur{
         else {
             console.log(this.jeu.cartes.length)
             console.log("pioche")
-            return this.pioche(game)
+            this.old_pioche(1,game)
+            return null
         }
     }
 }

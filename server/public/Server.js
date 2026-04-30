@@ -14,6 +14,8 @@ import {
   handleContreUno,
   deleteGame,
   syncGameWithLobbySize,
+  reset_game,
+  waiting,
 } from "./gameService.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -290,6 +292,14 @@ io.on("connection", (socket) => {
       console.error("Erreur contre_uno:", err.message);
     }
   });
+
+  socket.on("game_restart", (lobbyId) => {
+    reset_game(io, socket, lobbies, lobbyId)
+  })
+
+  socket.on("on_cd", (lobbyId)=> {
+    waiting(io, socket, lobbies, lobbyId)
+  })
 
   socket.on("disconnect", () => {
     try {
